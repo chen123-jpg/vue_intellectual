@@ -432,7 +432,10 @@ export default {
     async saveRecord() {
       const data = { ...this.editForm }
       for (const f of this.currentFields) {
-        if (f.type === 'date' && data[f.key] === '') data[f.key] = null
+        if (f.type === 'date') {
+          if (data[f.key] === '' || data[f.key] === null) { data[f.key] = null }
+          else if (!/ \d{2}:\d{2}:\d{2}$/.test(data[f.key])) { data[f.key] = data[f.key] + ' 00:00:00' }
+        }
       }
       try {
         if (this.modalMode === 'add') {
