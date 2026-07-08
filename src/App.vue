@@ -15,17 +15,10 @@
   <DisclosureTable v-if="activeTab === 'disclosure'" />
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
 import PatentTable from './components/PatentTable.vue'
 import DisclosureTable from './components/DisclosureTable.vue'
 
-export default {
-  name: 'App',
-  components: { PatentTable, DisclosureTable },
-  data() {
-    return {
-      activeTab: 'patent'
-    }
-  }
-}
+const activeTab = ref('patent')
 </script>

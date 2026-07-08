@@ -149,4 +149,26 @@ export async function deleteRecord(sheetName, id) {
   return result
 }
 
-export { http }
+/**
+ * 上传文件到后端
+ * @param {File} file
+ * @returns {Promise<{path: string, name: string}>}
+ */
+export async function uploadFile(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  // 直接调用 axios，不设置 Content-Type，浏览器会自动生成 multipart/form-data
+  const response = await axios.post(`${API_BASE}/upload`, formData)
+
+  if (response.data.code === 200) {
+    return {
+      path: response.data.data,  // 如 "/files/abc.pdf"
+      name: file.name
+    }
+  }
+  throw new Error(response.data.message || '上传失败')
+}
+
+// 导出 http 和 API_BASE，供外部使用
+export { http, API_BASE }

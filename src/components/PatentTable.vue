@@ -9,11 +9,11 @@
 
   <div class="tab-nav">
     <div
-      v-for="name in sheetNames"
-      :key="name"
-      class="tab-btn"
-      :class="{ active: currentSheet === name }"
-      @click="switchSheet(name)"
+        v-for="name in sheetNames"
+        :key="name"
+        class="tab-btn"
+        :class="{ active: currentSheet === name }"
+        @click="switchSheet(name)"
     >
       {{ name }}
       <span class="badge">{{ getRowCount(name) }}</span>
@@ -36,39 +36,48 @@
     <div class="table-scroll">
       <table>
         <thead>
-          <tr>
-            <th class="col-actions">操作</th>
-            <th v-for="field in currentFields" :key="field.key">
-              {{ field.label }}
-              <span
+        <tr>
+          <th class="col-actions">操作</th>
+          <th v-for="field in currentFields" :key="field.key">
+            {{ field.label }}
+            <span
                 v-if="isCustomField(field.key)"
                 class="remove-field-btn"
                 @click="removeCustomField(field.key)"
-              >&times;</span>
-            </th>
-          </tr>
+            >&times;</span>
+          </th>
+        </tr>
         </thead>
         <tbody>
-          <tr v-if="filteredRows.length === 0">
-            <td :colspan="currentFields.length + 1" class="empty-row">
-              {{ searchKeyword ? '没有找到匹配的记录' : '暂无数据，点击 "新增" 添加' }}
-            </td>
-          </tr>
-          <tr v-for="row in filteredRows" :key="row.id">
-            <td class="col-actions">
-              <button class="btn warning sm" @click="openEditModal(row)">编辑</button>
-              <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
-            </td>
-            <td v-for="field in currentFields" :key="field.key">
-              <div
+        <tr v-if="filteredRows.length === 0">
+          <td :colspan="currentFields.length + 1" class="empty-row">
+            {{ searchKeyword ? '没有找到匹配的记录' : '暂无数据，点击 "新增" 添加' }}
+          </td>
+        </tr>
+        <tr v-for="row in filteredRows" :key="row.id">
+          <td class="col-actions">
+            <button class="btn warning sm" @click="openEditModal(row)">编辑</button>
+            <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
+          </td>
+          <td v-for="field in currentFields" :key="field.key">
+            <div
+                v-if="field.key === 'notification' && isFilePath(row[field.key])"
+                class="cell-text"
+            >
+              <a :href="fileViewUrl(row[field.key])" target="_blank" class="file-link">
+                📎 查看文件
+              </a>
+            </div>
+            <div
+                v-else
                 class="cell-text"
                 @mouseenter="handleCellEnter($event, formatValue(row[field.key], field.type))"
                 @mouseleave="handleCellLeave"
-              >
-                {{ formatValue(row[field.key], field.type) }}
-              </div>
-            </td>
-          </tr>
+            >
+              {{ formatValue(row[field.key], field.type) }}
+            </div>
+          </td>
+        </tr>
         </tbody>
       </table>
     </div>
@@ -76,11 +85,11 @@
 
   <!-- Cell tooltip -->
   <div
-    v-if="tooltip.show"
-    class="text-tooltip"
-    :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
-    @mouseenter="tooltipHover = true"
-    @mouseleave="tooltipHover = false"
+      v-if="tooltip.show"
+      class="text-tooltip"
+      :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
+      @mouseenter="tooltipHover = true"
+      @mouseleave="tooltipHover = false"
   >
     {{ tooltip.text }}
   </div>
@@ -100,21 +109,21 @@
           <template v-if="field.key === 'internalNo' && modalMode === 'add'">
             <div class="autocomplete-wrapper">
               <input
-                class="form-input"
-                v-model="editForm.internalNo"
-                placeholder="输入内部编号，匹配T表记录..."
-                @input="onInternalNoInput"
-                @focus="onInternalNoFocus"
-                @blur="onInternalNoBlur"
-                @keydown.esc="autoCompleteVisible = false"
-                autocomplete="off"
+                  class="form-input"
+                  v-model="editForm.internalNo"
+                  placeholder="输入内部编号，匹配T表记录..."
+                  @input="onInternalNoInput"
+                  @focus="onInternalNoFocus"
+                  @blur="onInternalNoBlur"
+                  @keydown.esc="autoCompleteVisible = false"
+                  autocomplete="off"
               />
               <div v-if="autoCompleteVisible && autoCompleteItems.length > 0" class="autocomplete-dropdown">
                 <div
-                  v-for="item in autoCompleteItems"
-                  :key="item.id"
-                  class="autocomplete-item"
-                  @mousedown.prevent="onAutocompleteSelect(item)"
+                    v-for="item in autoCompleteItems"
+                    :key="item.id"
+                    class="autocomplete-item"
+                    @mousedown.prevent="onAutocompleteSelect(item)"
                 >
                   <span class="ac-no">{{ item.internalNo }}</span>
                   <span class="ac-name">{{ item.disclosureName }}</span>
@@ -123,19 +132,45 @@
             </div>
           </template>
 
+          <!-- notification file input -->
+          <template v-else-if="field.key === 'notification'">
+            <div class="file-input-row">
+              <input
+                  class="form-input"
+                  v-model="editForm.notification"
+                  :placeholder="field.label + '（输入文本或上传文件）'"
+              />
+              <label class="file-upload-btn">
+                <input
+                    type="file"
+                    accept=".doc,.docx,.xml,.pdf,.txt,.jpg,.jpeg,.png"
+                    @change="onNotificationFileChange"
+                    :disabled="notificationUploading"
+                    style="display:none"
+                />
+                <span class="btn sm outline" :class="{ disabled: notificationUploading }">
+                  {{ notificationUploading ? '上传中...' : '选择文件' }}
+                </span>
+              </label>
+            </div>
+            <div v-if="notificationFileName" class="file-name-tip">
+              已上传：{{ notificationFileName }}
+            </div>
+          </template>
+
           <!-- normal text input -->
           <input
-            v-else-if="field.type !== 'date'"
-            class="form-input"
-            v-model="editForm[field.key]"
-            :placeholder="field.label"
+              v-else-if="field.type !== 'date'"
+              class="form-input"
+              v-model="editForm[field.key]"
+              :placeholder="field.label"
           />
           <!-- date input -->
           <input
-            v-else
-            class="form-input"
-            type="date"
-            v-model="editForm[field.key]"
+              v-else
+              class="form-input"
+              type="date"
+              v-model="editForm[field.key]"
           />
         </div>
       </div>
@@ -175,8 +210,13 @@
   </div>
 </template>
 
-<script>
-import { fetchSheetList, fetchAllSheets, createRecord, updateRecord, deleteRecord as apiDeleteRecord } from '../api/patentApi.js'
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import {
+  fetchSheetList, fetchAllSheets, createRecord,
+  updateRecord, deleteRecord as apiDeleteRecord,
+  uploadFile, API_BASE
+} from '../api/patentApi.js'
 import { fetchAllDisclosures } from '../api/disclosureApi.js'
 
 const SHEET_CONFIGS = {
@@ -275,327 +315,373 @@ const SHEET_CONFIGS = {
 
 const SHEET_NAMES = Object.keys(SHEET_CONFIGS)
 const CUSTOM_FIELDS_KEY = 'patent_custom_fields'
+const sheetNames = SHEET_NAMES
 
-export default {
-  name: 'PatentTable',
-  data() {
-    return {
-      currentSheet: '1-专利新申请',
-      searchKeyword: '',
-      dataCache: {},
-      modalVisible: false,
-      modalMode: 'add',
-      editForm: {},
-      editId: null,
-      toastMessage: '',
-      toastType: 'info',
-      toastTimer: null,
+// ---- Reactive state ----
+const currentSheet = ref('1-专利新申请')
+const searchKeyword = ref('')
+const dataCache = reactive({})
+const modalVisible = ref(false)
+const modalMode = ref('add')
+const editForm = ref({})
+const editId = ref(null)
+const toastMessage = ref('')
+const toastType = ref('info')
+const toastTimer = ref(null)
 
-      // tooltip
-      tooltip: { show: false, x: 0, y: 0, text: '' },
-      tooltipHover: false,
-      hideTimer: null,
+const tooltip = reactive({ show: false, x: 0, y: 0, text: '' })
+const tooltipHover = ref(false)
+const hideTimer = ref(null)
 
-      // T表 autocomplete
-      disclosureCache: [],
-      autoCompleteVisible: false,
-      autoCompleteItems: [],
-      autoCompleteBlurTimer: null,
+const disclosureCache = ref([])
+const autoCompleteVisible = ref(false)
+const autoCompleteItems = ref([])
+const autoCompleteBlurTimer = ref(null)
 
-      // custom fields
-      customFields: {},
-      showCustomFieldForm: false,
-      customFieldLabel: '',
-      customFieldKey: ''
+const notificationUploading = ref(false)
+const notificationFileName = ref('')
+
+const customFields = ref({})
+const showCustomFieldForm = ref(false)
+const customFieldLabel = ref('')
+const customFieldKey = ref('')
+
+// ---- Computed ----
+const currentFields = computed(() => {
+  const base = SHEET_CONFIGS[currentSheet.value] || []
+  const customs = customFields.value[currentSheet.value] || []
+  return [...base, ...customs]
+})
+
+const currentRows = computed(() => dataCache[currentSheet.value] || [])
+
+const filteredRows = computed(() => {
+  if (!searchKeyword.value.trim()) return currentRows.value
+  const kw = searchKeyword.value.trim().toLowerCase()
+  return currentRows.value.filter((row) => {
+    for (const f of currentFields.value) {
+      if (String(row[f.key] || '').toLowerCase().includes(kw)) return true
     }
-  },
-  computed: {
-    sheetNames() { return SHEET_NAMES },
-    currentFields() {
-      const base = SHEET_CONFIGS[this.currentSheet] || []
-      const customs = this.customFields[this.currentSheet] || []
-      return [...base, ...customs]
-    },
-    hasInternalNo() {
-      return this.currentFields.some(f => f.key === 'internalNo')
-    },
-    currentRows() { return this.dataCache[this.currentSheet] || [] },
-    filteredRows() {
-      if (!this.searchKeyword.trim()) return this.currentRows
-      const kw = this.searchKeyword.trim().toLowerCase()
-      return this.currentRows.filter((row) => {
-        for (const f of this.currentFields) {
-          if (String(row[f.key] || '').toLowerCase().includes(kw)) return true
-        }
-        return false
-      })
-    },
-    totalCount() {
-      let sum = 0
-      for (const name of SHEET_NAMES) sum += (this.dataCache[name] || []).length
-      return sum
-    },
-    modalTitle() {
-      return this.modalMode === 'add'
-        ? `新增记录 - ${this.currentSheet}`
-        : `编辑记录 - ${this.currentSheet}`
-    }
-  },
-  methods: {
-    async loadSheetData(sheetName) {
-      try {
-        this.dataCache[sheetName] = await fetchSheetList(sheetName)
-      } catch (e) {
-        this.showToast(`${sheetName} 加载失败: ` + e.message, 'error')
-      }
-    },
-    async loadAllSheetData() {
-      try {
-        const map = await fetchAllSheets(SHEET_NAMES)
-        for (const name of SHEET_NAMES) this.dataCache[name] = map[name] || []
-      } catch (e) {
-        this.showToast('加载全部数据失败: ' + e.message, 'error')
-      }
-    },
-    async reloadCurrentSheet() {
-      await this.loadSheetData(this.currentSheet)
-    },
-    getRowCount(name) {
-      return (this.dataCache[name] || []).length
-    },
-    formatValue(value, type) {
-      if (value === undefined || value === null) return ''
-      if (type === 'date' && typeof value === 'string' && value.includes('T')) {
-        return value.split('T')[0]
-      }
-      return String(value)
-    },
-    switchSheet(name) {
-      if (this.currentSheet === name) return
-      this.currentSheet = name
-      this.searchKeyword = ''
-      this.tooltip.show = false
-      this.tooltipHover = false
-      clearTimeout(this.hideTimer)
-    },
-    clearSearch() { this.searchKeyword = '' },
-    async refreshData() {
-      await this.loadAllSheetData()
-      this.showToast('全部数据已刷新', 'success')
-    },
+    return false
+  })
+})
 
-    async loadDisclosureCache() {
-      try {
-        this.disclosureCache = await fetchAllDisclosures()
-      } catch {
-        this.disclosureCache = []
-      }
-    },
+const totalCount = computed(() => {
+  let sum = 0
+  for (const name of SHEET_NAMES) sum += (dataCache[name] || []).length
+  return sum
+})
 
-    openAddModal() {
-      this.modalMode = 'add'
-      this.editId = null
-      const form = {}
-      for (const f of this.currentFields) form[f.key] = ''
-      this.editForm = form
-      this.modalVisible = true
-      this.autoCompleteVisible = false
-      this.autoCompleteItems = []
-      this.tooltip.show = false
-      this.tooltipHover = false
-      clearTimeout(this.hideTimer)
-      // preload T表 data for autocomplete
-      this.loadDisclosureCache()
-    },
-    openEditModal(row) {
-      this.modalMode = 'edit'
-      this.editId = row.id
-      const form = {}
-      for (const f of this.currentFields) {
-        form[f.key] = row[f.key] !== undefined ? row[f.key] : ''
-      }
-      this.editForm = form
-      this.autoCompleteVisible = false
-      this.autoCompleteItems = []
-      this.modalVisible = true
-      this.tooltip.show = false
-      this.tooltipHover = false
-      clearTimeout(this.hideTimer)
-    },
-    closeModal() {
-      this.modalVisible = false
-      this.editForm = {}
-      this.editId = null
-      this.autoCompleteVisible = false
-      this.autoCompleteItems = []
-    },
-    async saveRecord() {
-      const data = { ...this.editForm }
-      for (const f of this.currentFields) {
-        if (f.type === 'date') {
-          if (data[f.key] === '' || data[f.key] === null) { data[f.key] = null }
-          else if (!/ \d{2}:\d{2}:\d{2}$/.test(data[f.key])) { data[f.key] = data[f.key] + ' 00:00:00' }
-        }
-      }
-      try {
-        if (this.modalMode === 'add') {
-          await createRecord(this.currentSheet, data)
-        } else {
-          await updateRecord(this.currentSheet, this.editId, data)
-        }
-        this.showToast(this.modalMode === 'add' ? '新增成功' : '更新成功', 'success')
-        this.closeModal()
-        await this.reloadCurrentSheet()
-      } catch (e) {
-        this.showToast('请求失败: ' + e.message, 'error')
-      }
-    },
-    deleteRecord(row) {
-      const name = row.patentName || row.applicationName || '未命名'
-      if (!confirm(`确定要删除 "${name}" 吗？此操作不可恢复！`)) return
-      apiDeleteRecord(this.currentSheet, row.id)
-        .then(async () => {
-          this.showToast('已删除', 'success')
-          await this.reloadCurrentSheet()
-        })
-        .catch((e) => {
-          this.showToast('请求失败: ' + e.message, 'error')
-        })
-    },
-    showToast(message, type = 'info') {
-      this.toastMessage = message
-      this.toastType = type
-      if (this.toastTimer) clearTimeout(this.toastTimer)
-      this.toastTimer = setTimeout(() => {
-        this.toastMessage = ''
-        this.toastType = 'info'
-      }, 3000)
-    },
+const modalTitle = computed(() => {
+  return modalMode.value === 'add'
+    ? `新增记录 - ${currentSheet.value}`
+    : `编辑记录 - ${currentSheet.value}`
+})
 
-    // Tooltip
-    handleCellEnter(event, text) {
-      const el = event.currentTarget
-      if (el.scrollWidth <= el.clientWidth) return
-      clearTimeout(this.hideTimer)
-      const rect = el.getBoundingClientRect()
-      this.tooltip.text = text
-      this.tooltip.x = rect.left + 10
-      this.tooltip.y = rect.bottom + window.scrollY + 8
-      this.tooltip.show = true
-    },
-    handleCellLeave() {
-      clearTimeout(this.hideTimer)
-      this.hideTimer = setTimeout(() => {
-        if (!this.tooltipHover) this.tooltip.show = false
-      }, 300)
-    },
+// ---- Methods ----
+function showToast(message, type = 'info') {
+  toastMessage.value = message
+  toastType.value = type
+  if (toastTimer.value) clearTimeout(toastTimer.value)
+  toastTimer.value = setTimeout(() => {
+    toastMessage.value = ''
+    toastType.value = 'info'
+  }, 3000)
+}
 
-    // ---- T表 autocomplete on internalNo ----
-    onInternalNoInput() {
-      const val = (this.editForm.internalNo || '').trim().toLowerCase()
-      if (!val) {
-        this.autoCompleteItems = []
-        this.autoCompleteVisible = false
-        return
-      }
-      this.autoCompleteItems = this.disclosureCache
-        .filter(d => (d.internalNo || '').toLowerCase().includes(val))
-        .slice(0, 8)
-      this.autoCompleteVisible = this.autoCompleteItems.length > 0
-    },
-    onInternalNoFocus() {
-      const val = (this.editForm.internalNo || '').trim()
-      if (val && this.disclosureCache.length > 0) {
-        this.autoCompleteItems = this.disclosureCache
-          .filter(d => (d.internalNo || '').toLowerCase().includes(val.toLowerCase()))
-          .slice(0, 8)
-        this.autoCompleteVisible = this.autoCompleteItems.length > 0
-      }
-    },
-    onInternalNoBlur() {
-      clearTimeout(this.autoCompleteBlurTimer)
-      this.autoCompleteBlurTimer = setTimeout(() => {
-        this.autoCompleteVisible = false
-      }, 150)
-    },
-    onAutocompleteSelect(record) {
-      const fields = this.currentFields
-      const has = (key) => fields.some(f => f.key === key)
-
-      if (record.internalNo && has('internalNo')) this.editForm.internalNo = record.internalNo
-      if (record.disclosureName) {
-        if (has('patentName')) this.editForm.patentName = record.disclosureName
-        if (has('applicationName')) this.editForm.applicationName = record.disclosureName
-      }
-      if (record.applicant && has('applicant')) this.editForm.applicant = record.applicant
-      if (record.agent && has('agent')) this.editForm.agent = record.agent
-      if (record.contactPerson && has('inventor')) this.editForm.inventor = record.contactPerson
-      if (record.manager && has('sponsor')) this.editForm.sponsor = record.manager
-
-      this.autoCompleteVisible = false
-      this.showToast('T表数据已导入，请检查并补充其他字段', 'success')
-    },
-
-    // ---- Custom fields ----
-    loadCustomFields() {
-      try {
-        const raw = localStorage.getItem(CUSTOM_FIELDS_KEY)
-        const parsed = raw ? JSON.parse(raw) : {}
-        this.customFields = {}
-        for (const name of SHEET_NAMES) {
-          this.customFields[name] = Array.isArray(parsed[name]) ? parsed[name] : []
-        }
-      } catch {
-        this.customFields = {}
-        for (const name of SHEET_NAMES) this.customFields[name] = []
-      }
-    },
-    saveCustomFieldsToStorage() {
-      localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields))
-    },
-    isCustomField(key) {
-      const customs = this.customFields[this.currentSheet] || []
-      return customs.some(f => f.key === key)
-    },
-    openCustomFieldForm() {
-      this.showCustomFieldForm = true
-      this.customFieldLabel = ''
-      this.customFieldKey = ''
-    },
-    closeCustomFieldForm() {
-      this.showCustomFieldForm = false
-      this.customFieldLabel = ''
-      this.customFieldKey = ''
-    },
-    addCustomField() {
-      const label = this.customFieldLabel.trim()
-      const key = this.customFieldKey.trim()
-      if (!label) { this.showToast('请输入字段名称', 'warning'); return }
-      if (!key) { this.showToast('请输入字段键名', 'warning'); return }
-      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
-        this.showToast('字段键名只能包含字母、数字和下划线，且以字母或下划线开头', 'warning')
-        return
-      }
-      const existing = this.currentFields.some(f => f.key === key)
-      if (existing) { this.showToast('字段键名已存在，请换一个', 'warning'); return }
-      this.customFields[this.currentSheet].push({ key, label })
-      this.saveCustomFieldsToStorage()
-      this.closeCustomFieldForm()
-      this.showToast(`自定义字段 "${label}" 已添加`, 'success')
-    },
-    removeCustomField(key) {
-      this.customFields[this.currentSheet] = this.customFields[this.currentSheet].filter(f => f.key !== key)
-      this.saveCustomFieldsToStorage()
-      this.showToast('自定义字段已移除', 'info')
-    }
-  },
-
-  async mounted() {
-    for (const name of SHEET_NAMES) this.dataCache[name] = []
-    this.loadCustomFields()
-    await this.loadAllSheetData()
+async function loadSheetData(sheetName) {
+  try {
+    dataCache[sheetName] = await fetchSheetList(sheetName)
+  } catch (e) {
+    showToast(`${sheetName} 加载失败: ` + e.message, 'error')
   }
 }
+
+async function loadAllSheetData() {
+  try {
+    const map = await fetchAllSheets(SHEET_NAMES)
+    for (const name of SHEET_NAMES) dataCache[name] = map[name] || []
+  } catch (e) {
+    showToast('加载全部数据失败: ' + e.message, 'error')
+  }
+}
+
+async function reloadCurrentSheet() {
+  await loadSheetData(currentSheet.value)
+}
+
+function getRowCount(name) {
+  return (dataCache[name] || []).length
+}
+
+function formatValue(value, type) {
+  if (value === undefined || value === null) return ''
+  if (type === 'date' && typeof value === 'string' && value.includes('T')) {
+    return value.split('T')[0]
+  }
+  return String(value)
+}
+
+function switchSheet(name) {
+  if (currentSheet.value === name) return
+  currentSheet.value = name
+  searchKeyword.value = ''
+  tooltip.show = false
+  tooltipHover.value = false
+  clearTimeout(hideTimer.value)
+}
+
+function clearSearch() { searchKeyword.value = '' }
+
+async function refreshData() {
+  await loadAllSheetData()
+  showToast('全部数据已刷新', 'success')
+}
+
+async function loadDisclosureCache() {
+  try {
+    disclosureCache.value = await fetchAllDisclosures()
+  } catch {
+    disclosureCache.value = []
+  }
+}
+
+function openAddModal() {
+  modalMode.value = 'add'
+  editId.value = null
+  const form = {}
+  for (const f of currentFields.value) form[f.key] = ''
+  editForm.value = form
+  modalVisible.value = true
+  autoCompleteVisible.value = false
+  autoCompleteItems.value = []
+  notificationFileName.value = ''
+  tooltip.show = false
+  tooltipHover.value = false
+  clearTimeout(hideTimer.value)
+  loadDisclosureCache()
+}
+
+function openEditModal(row) {
+  modalMode.value = 'edit'
+  editId.value = row.id
+  const form = {}
+  for (const f of currentFields.value) {
+    form[f.key] = row[f.key] !== undefined ? row[f.key] : ''
+  }
+  editForm.value = form
+  autoCompleteVisible.value = false
+  autoCompleteItems.value = []
+  notificationFileName.value = ''
+  modalVisible.value = true
+  tooltip.show = false
+  tooltipHover.value = false
+  clearTimeout(hideTimer.value)
+}
+
+function closeModal() {
+  modalVisible.value = false
+  editForm.value = {}
+  editId.value = null
+  autoCompleteVisible.value = false
+  autoCompleteItems.value = []
+  notificationFileName.value = ''
+}
+
+async function saveRecord() {
+  const data = { ...editForm.value }
+  for (const f of currentFields.value) {
+    if (f.type === 'date') {
+      if (data[f.key] === '' || data[f.key] === null) { data[f.key] = null }
+      else if (!/ \d{2}:\d{2}:\d{2}$/.test(data[f.key])) { data[f.key] = data[f.key] + ' 00:00:00' }
+    }
+  }
+  try {
+    if (modalMode.value === 'add') {
+      await createRecord(currentSheet.value, data)
+    } else {
+      await updateRecord(currentSheet.value, editId.value, data)
+    }
+    showToast(modalMode.value === 'add' ? '新增成功' : '更新成功', 'success')
+    closeModal()
+    await reloadCurrentSheet()
+  } catch (e) {
+    showToast('请求失败: ' + e.message, 'error')
+  }
+}
+
+function deleteRecord(row) {
+  const name = row.patentName || row.applicationName || '未命名'
+  if (!confirm(`确定要删除 "${name}" 吗？此操作不可恢复！`)) return
+  apiDeleteRecord(currentSheet.value, row.id)
+    .then(async () => {
+      showToast('已删除', 'success')
+      await reloadCurrentSheet()
+    })
+    .catch((e) => {
+      showToast('请求失败: ' + e.message, 'error')
+    })
+}
+
+// ---- File upload ----
+async function onNotificationFileChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  notificationUploading.value = true
+  try {
+    const result = await uploadFile(file)
+    editForm.value.notification = result.path
+    notificationFileName.value = result.name
+    showToast('文件上传成功', 'success')
+  } catch (err) {
+    showToast('文件上传失败: ' + err.message, 'error')
+  } finally {
+    notificationUploading.value = false
+    e.target.value = ''
+  }
+}
+
+function isFilePath(value) {
+  return typeof value === 'string' && value.startsWith('/files/')
+}
+
+function fileViewUrl(path) {
+  return `${API_BASE}${path}`
+}
+
+// ---- Tooltip ----
+function handleCellEnter(event, text) {
+  const el = event.currentTarget
+  if (el.scrollWidth <= el.clientWidth) return
+  clearTimeout(hideTimer.value)
+  const rect = el.getBoundingClientRect()
+  tooltip.text = text
+  tooltip.x = rect.left + 10
+  tooltip.y = rect.bottom + window.scrollY + 8
+  tooltip.show = true
+}
+
+function handleCellLeave() {
+  clearTimeout(hideTimer.value)
+  hideTimer.value = setTimeout(() => {
+    if (!tooltipHover.value) tooltip.show = false
+  }, 300)
+}
+
+// ---- T表 autocomplete on internalNo ----
+function onInternalNoInput() {
+  const val = (editForm.value.internalNo || '').trim().toLowerCase()
+  if (!val) {
+    autoCompleteItems.value = []
+    autoCompleteVisible.value = false
+    return
+  }
+  autoCompleteItems.value = disclosureCache.value
+    .filter(d => (d.internalNo || '').toLowerCase().includes(val))
+    .slice(0, 8)
+  autoCompleteVisible.value = autoCompleteItems.value.length > 0
+}
+
+function onInternalNoFocus() {
+  const val = (editForm.value.internalNo || '').trim()
+  if (val && disclosureCache.value.length > 0) {
+    autoCompleteItems.value = disclosureCache.value
+      .filter(d => (d.internalNo || '').toLowerCase().includes(val.toLowerCase()))
+      .slice(0, 8)
+    autoCompleteVisible.value = autoCompleteItems.value.length > 0
+  }
+}
+
+function onInternalNoBlur() {
+  clearTimeout(autoCompleteBlurTimer.value)
+  autoCompleteBlurTimer.value = setTimeout(() => {
+    autoCompleteVisible.value = false
+  }, 150)
+}
+
+function onAutocompleteSelect(record) {
+  const fields = currentFields.value
+  const has = (key) => fields.some(f => f.key === key)
+
+  if (record.internalNo && has('internalNo')) editForm.value.internalNo = record.internalNo
+  if (record.disclosureName) {
+    if (has('patentName')) editForm.value.patentName = record.disclosureName
+    if (has('applicationName')) editForm.value.applicationName = record.disclosureName
+  }
+  if (record.applicant && has('applicant')) editForm.value.applicant = record.applicant
+  if (record.agent && has('agent')) editForm.value.agent = record.agent
+  if (record.contactPerson && has('inventor')) editForm.value.inventor = record.contactPerson
+  if (record.manager && has('sponsor')) editForm.value.sponsor = record.manager
+
+  autoCompleteVisible.value = false
+  showToast('T表数据已导入，请检查并补充其他字段', 'success')
+}
+
+// ---- Custom fields ----
+function loadCustomFields() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_FIELDS_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    customFields.value = {}
+    for (const name of SHEET_NAMES) {
+      customFields.value[name] = Array.isArray(parsed[name]) ? parsed[name] : []
+    }
+  } catch {
+    customFields.value = {}
+    for (const name of SHEET_NAMES) customFields.value[name] = []
+  }
+}
+
+function saveCustomFieldsToStorage() {
+  localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(customFields.value))
+}
+
+function isCustomField(key) {
+  const customs = customFields.value[currentSheet.value] || []
+  return customs.some(f => f.key === key)
+}
+
+function openCustomFieldForm() {
+  showCustomFieldForm.value = true
+  customFieldLabel.value = ''
+  customFieldKey.value = ''
+}
+
+function closeCustomFieldForm() {
+  showCustomFieldForm.value = false
+  customFieldLabel.value = ''
+  customFieldKey.value = ''
+}
+
+function addCustomField() {
+  const label = customFieldLabel.value.trim()
+  const key = customFieldKey.value.trim()
+  if (!label) { showToast('请输入字段名称', 'warning'); return }
+  if (!key) { showToast('请输入字段键名', 'warning'); return }
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+    showToast('字段键名只能包含字母、数字和下划线，且以字母或下划线开头', 'warning')
+    return
+  }
+  const existing = currentFields.value.some(f => f.key === key)
+  if (existing) { showToast('字段键名已存在，请换一个', 'warning'); return }
+  customFields.value[currentSheet.value].push({ key, label })
+  saveCustomFieldsToStorage()
+  closeCustomFieldForm()
+  showToast(`自定义字段 "${label}" 已添加`, 'success')
+}
+
+function removeCustomField(key) {
+  customFields.value[currentSheet.value] = customFields.value[currentSheet.value].filter(f => f.key !== key)
+  saveCustomFieldsToStorage()
+  showToast('自定义字段已移除', 'info')
+}
+
+// ---- Lifecycle ----
+onMounted(async () => {
+  for (const name of SHEET_NAMES) dataCache[name] = []
+  loadCustomFields()
+  await loadAllSheetData()
+})
 </script>
 
 <style scoped>
@@ -663,5 +749,34 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* File upload */
+.file-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.file-input-row .form-input {
+  flex: 1;
+}
+.file-upload-btn {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.file-name-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #2980b9;
+}
+.file-link {
+  color: #1a5c9e;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.file-link:hover { color: #134a80; }
+.btn.sm.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 </style>
