@@ -6,78 +6,86 @@
       <span class="stat-item">{{ sheetNames.length }} 个分类</span>
     </div>
   </div>
+
   <div class="tab-nav">
     <div
-        v-for="name in sheetNames"
-        :key="name"
-        class="tab-btn"
-        :class="{ active: currentSheet === name }"
-        @click="switchSheet(name)"
+      v-for="name in sheetNames"
+      :key="name"
+      class="tab-btn"
+      :class="{ active: currentSheet === name }"
+      @click="switchSheet(name)"
     >
       {{ name }}
       <span class="badge">{{ getRowCount(name) }}</span>
     </div>
   </div>
+
   <div class="toolbar">
     <div class="search-box">
-      <input
-          class="search-input"
-          placeholder="搜索所有字段..."
-          v-model="searchKeyword"
-      />
+      <input class="search-input" placeholder="搜索所有字段..." v-model="searchKeyword" />
       <span class="clear-btn" @click="clearSearch">清空</span>
     </div>
     <div class="actions">
       <button class="btn primary" @click="openAddModal">新增</button>
+      <button class="btn outline" @click="openCustomFieldForm">添加字段</button>
       <button class="btn outline" @click="refreshData">刷新</button>
     </div>
   </div>
+
   <div class="table-wrapper">
     <div class="table-scroll">
       <table>
         <thead>
-        <tr>
-          <th class="col-actions">操作</th>
-          <th v-for="field in currentFields" :key="field.key">{{ field.label }}</th>
-        </tr>
+          <tr>
+            <th class="col-actions">操作</th>
+            <th v-for="field in currentFields" :key="field.key">
+              {{ field.label }}
+              <span
+                v-if="isCustomField(field.key)"
+                class="remove-field-btn"
+                @click="removeCustomField(field.key)"
+              >&times;</span>
+            </th>
+          </tr>
         </thead>
         <tbody>
-        <tr v-if="filteredRows.length === 0">
-          <td :colspan="currentFields.length + 1" class="empty-row">
-            {{ searchKeyword ? '没有找到匹配的记录' : '暂无数据，点击 "新增" 添加' }}
-          </td>
-        </tr>
-        <tr v-for="row in filteredRows" :key="row.id">
-          <td class="col-actions">
-            <button class="btn warning sm" @click="openEditModal(row)">编辑</button>
-            <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
-          </td>
-          <td v-for="field in currentFields" :key="field.key">
-            <div
+          <tr v-if="filteredRows.length === 0">
+            <td :colspan="currentFields.length + 1" class="empty-row">
+              {{ searchKeyword ? '没有找到匹配的记录' : '暂无数据，点击 "新增" 添加' }}
+            </td>
+          </tr>
+          <tr v-for="row in filteredRows" :key="row.id">
+            <td class="col-actions">
+              <button class="btn warning sm" @click="openEditModal(row)">编辑</button>
+              <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
+            </td>
+            <td v-for="field in currentFields" :key="field.key">
+              <div
                 class="cell-text"
                 @mouseenter="handleCellEnter($event, formatValue(row[field.key], field.type))"
                 @mouseleave="handleCellLeave"
-            >
-              {{ formatValue(row[field.key], field.type) }}
-            </div>
-          </td>
-        </tr>
+              >
+                {{ formatValue(row[field.key], field.type) }}
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- 悬浮Tooltip，支持移入选文字 -->
+  <!-- Cell tooltip -->
   <div
-      v-if="tooltip.show"
-      class="text-tooltip"
-      :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
-      @mouseenter="tooltipHover = true"
-      @mouseleave="tooltipHover = false"
+    v-if="tooltip.show"
+    class="text-tooltip"
+    :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
+    @mouseenter="tooltipHover = true"
+    @mouseleave="tooltipHover = false"
   >
     {{ tooltip.text }}
   </div>
 
+  <!-- Add/Edit modal -->
   <div class="modal-overlay" v-if="modalVisible" @click="closeModal">
     <div class="modal" @click.stop>
       <div class="modal-header">
@@ -87,17 +95,47 @@
       <div class="modal-body">
         <div v-for="field in currentFields" :key="field.key" class="form-group">
           <label class="form-label">{{ field.label }}</label>
+
+          <!-- internalNo field with T表 autocomplete (add mode only) -->
+          <template v-if="field.key === 'internalNo' && modalMode === 'add'">
+            <div class="autocomplete-wrapper">
+              <input
+                class="form-input"
+                v-model="editForm.internalNo"
+                placeholder="输入内部编号，匹配T表记录..."
+                @input="onInternalNoInput"
+                @focus="onInternalNoFocus"
+                @blur="onInternalNoBlur"
+                @keydown.esc="autoCompleteVisible = false"
+                autocomplete="off"
+              />
+              <div v-if="autoCompleteVisible && autoCompleteItems.length > 0" class="autocomplete-dropdown">
+                <div
+                  v-for="item in autoCompleteItems"
+                  :key="item.id"
+                  class="autocomplete-item"
+                  @mousedown.prevent="onAutocompleteSelect(item)"
+                >
+                  <span class="ac-no">{{ item.internalNo }}</span>
+                  <span class="ac-name">{{ item.disclosureName }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- normal text input -->
           <input
-              v-if="field.type !== 'date'"
-              class="form-input"
-              v-model="editForm[field.key]"
-              :placeholder="field.label"
+            v-else-if="field.type !== 'date'"
+            class="form-input"
+            v-model="editForm[field.key]"
+            :placeholder="field.label"
           />
+          <!-- date input -->
           <input
-              v-else
-              class="form-input"
-              type="date"
-              v-model="editForm[field.key]"
+            v-else
+            class="form-input"
+            type="date"
+            v-model="editForm[field.key]"
           />
         </div>
       </div>
@@ -107,6 +145,31 @@
       </div>
     </div>
   </div>
+
+  <!-- Custom field modal -->
+  <div v-if="showCustomFieldForm" class="modal-overlay" @click.self="closeCustomFieldForm">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <span class="modal-title">添加自定义字段 - {{ currentSheet }}</span>
+        <span class="modal-close" @click="closeCustomFieldForm">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">字段名称（中文显示名）</label>
+          <input class="form-input" v-model="customFieldLabel" placeholder="如：优先级" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">字段键名（英文标识）</label>
+          <input class="form-input" v-model="customFieldKey" placeholder="如：custom_priority" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn outline" @click="closeCustomFieldForm">取消</button>
+        <button class="btn primary" @click="addCustomField">确认添加</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" :class="[toastType, { show: toastMessage }]">
     {{ toastMessage }}
   </div>
@@ -114,6 +177,8 @@
 
 <script>
 import { fetchSheetList, fetchAllSheets, createRecord, updateRecord, deleteRecord as apiDeleteRecord } from '../api/patentApi.js'
+import { fetchAllDisclosures } from '../api/disclosureApi.js'
+
 const SHEET_CONFIGS = {
   '1-专利新申请': [
     { key: 'internalNo',      label: '内部编号' },
@@ -207,7 +272,10 @@ const SHEET_CONFIGS = {
     { key: 'note1',            label: '附注1' }
   ]
 }
+
 const SHEET_NAMES = Object.keys(SHEET_CONFIGS)
+const CUSTOM_FIELDS_KEY = 'patent_custom_fields'
+
 export default {
   name: 'PatentTable',
   data() {
@@ -223,20 +291,34 @@ export default {
       toastType: 'info',
       toastTimer: null,
 
-      // 悬浮提示数据
-      tooltip: {
-        show: false,
-        x: 0,
-        y: 0,
-        text: ''
-      },
+      // tooltip
+      tooltip: { show: false, x: 0, y: 0, text: '' },
       tooltipHover: false,
-      hideTimer: null
+      hideTimer: null,
+
+      // T表 autocomplete
+      disclosureCache: [],
+      autoCompleteVisible: false,
+      autoCompleteItems: [],
+      autoCompleteBlurTimer: null,
+
+      // custom fields
+      customFields: {},
+      showCustomFieldForm: false,
+      customFieldLabel: '',
+      customFieldKey: ''
     }
   },
   computed: {
     sheetNames() { return SHEET_NAMES },
-    currentFields() { return SHEET_CONFIGS[this.currentSheet] || [] },
+    currentFields() {
+      const base = SHEET_CONFIGS[this.currentSheet] || []
+      const customs = this.customFields[this.currentSheet] || []
+      return [...base, ...customs]
+    },
+    hasInternalNo() {
+      return this.currentFields.some(f => f.key === 'internalNo')
+    },
     currentRows() { return this.dataCache[this.currentSheet] || [] },
     filteredRows() {
       if (!this.searchKeyword.trim()) return this.currentRows
@@ -255,8 +337,8 @@ export default {
     },
     modalTitle() {
       return this.modalMode === 'add'
-          ? `新增记录 - ${this.currentSheet}`
-          : `编辑记录 - ${this.currentSheet}`
+        ? `新增记录 - ${this.currentSheet}`
+        : `编辑记录 - ${this.currentSheet}`
     }
   },
   methods: {
@@ -283,9 +365,6 @@ export default {
     },
     formatValue(value, type) {
       if (value === undefined || value === null) return ''
-      if (type === 'string' && typeof value === 'string' && value.includes('T')) {
-        return value.split('T')[0]
-      }
       if (type === 'date' && typeof value === 'string' && value.includes('T')) {
         return value.split('T')[0]
       }
@@ -304,6 +383,15 @@ export default {
       await this.loadAllSheetData()
       this.showToast('全部数据已刷新', 'success')
     },
+
+    async loadDisclosureCache() {
+      try {
+        this.disclosureCache = await fetchAllDisclosures()
+      } catch {
+        this.disclosureCache = []
+      }
+    },
+
     openAddModal() {
       this.modalMode = 'add'
       this.editId = null
@@ -311,9 +399,13 @@ export default {
       for (const f of this.currentFields) form[f.key] = ''
       this.editForm = form
       this.modalVisible = true
+      this.autoCompleteVisible = false
+      this.autoCompleteItems = []
       this.tooltip.show = false
       this.tooltipHover = false
       clearTimeout(this.hideTimer)
+      // preload T表 data for autocomplete
+      this.loadDisclosureCache()
     },
     openEditModal(row) {
       this.modalMode = 'edit'
@@ -323,6 +415,8 @@ export default {
         form[f.key] = row[f.key] !== undefined ? row[f.key] : ''
       }
       this.editForm = form
+      this.autoCompleteVisible = false
+      this.autoCompleteItems = []
       this.modalVisible = true
       this.tooltip.show = false
       this.tooltipHover = false
@@ -332,10 +426,11 @@ export default {
       this.modalVisible = false
       this.editForm = {}
       this.editId = null
+      this.autoCompleteVisible = false
+      this.autoCompleteItems = []
     },
     async saveRecord() {
       const data = { ...this.editForm }
-      console.log('saveRecord data:', JSON.stringify(data))
       for (const f of this.currentFields) {
         if (f.type === 'date' && data[f.key] === '') data[f.key] = null
       }
@@ -356,13 +451,13 @@ export default {
       const name = row.patentName || row.applicationName || '未命名'
       if (!confirm(`确定要删除 "${name}" 吗？此操作不可恢复！`)) return
       apiDeleteRecord(this.currentSheet, row.id)
-          .then(async () => {
-            this.showToast('已删除', 'success')
-            await this.reloadCurrentSheet()
-          })
-          .catch((e) => {
-            this.showToast('请求失败: ' + e.message, 'error')
-          })
+        .then(async () => {
+          this.showToast('已删除', 'success')
+          await this.reloadCurrentSheet()
+        })
+        .catch((e) => {
+          this.showToast('请求失败: ' + e.message, 'error')
+        })
     },
     showToast(message, type = 'info') {
       this.toastMessage = message
@@ -374,12 +469,10 @@ export default {
       }, 3000)
     },
 
-    // 鼠标移入单元格：清除关闭计时器，显示浮窗
+    // Tooltip
     handleCellEnter(event, text) {
       const el = event.currentTarget
-      const isOverflow = el.scrollWidth > el.clientWidth
-      if (!isOverflow) return
-
+      if (el.scrollWidth <= el.clientWidth) return
       clearTimeout(this.hideTimer)
       const rect = el.getBoundingClientRect()
       this.tooltip.text = text
@@ -387,19 +480,116 @@ export default {
       this.tooltip.y = rect.bottom + window.scrollY + 8
       this.tooltip.show = true
     },
-    // 鼠标离开单元格：300ms延迟关闭，给移动到浮窗的时间
     handleCellLeave() {
       clearTimeout(this.hideTimer)
       this.hideTimer = setTimeout(() => {
-        // 只有鼠标不在浮窗内才关闭
-        if (!this.tooltipHover) {
-          this.tooltip.show = false
-        }
+        if (!this.tooltipHover) this.tooltip.show = false
       }, 300)
+    },
+
+    // ---- T表 autocomplete on internalNo ----
+    onInternalNoInput() {
+      const val = (this.editForm.internalNo || '').trim().toLowerCase()
+      if (!val) {
+        this.autoCompleteItems = []
+        this.autoCompleteVisible = false
+        return
+      }
+      this.autoCompleteItems = this.disclosureCache
+        .filter(d => (d.internalNo || '').toLowerCase().includes(val))
+        .slice(0, 8)
+      this.autoCompleteVisible = this.autoCompleteItems.length > 0
+    },
+    onInternalNoFocus() {
+      const val = (this.editForm.internalNo || '').trim()
+      if (val && this.disclosureCache.length > 0) {
+        this.autoCompleteItems = this.disclosureCache
+          .filter(d => (d.internalNo || '').toLowerCase().includes(val.toLowerCase()))
+          .slice(0, 8)
+        this.autoCompleteVisible = this.autoCompleteItems.length > 0
+      }
+    },
+    onInternalNoBlur() {
+      clearTimeout(this.autoCompleteBlurTimer)
+      this.autoCompleteBlurTimer = setTimeout(() => {
+        this.autoCompleteVisible = false
+      }, 150)
+    },
+    onAutocompleteSelect(record) {
+      const fields = this.currentFields
+      const has = (key) => fields.some(f => f.key === key)
+
+      if (record.internalNo && has('internalNo')) this.editForm.internalNo = record.internalNo
+      if (record.disclosureName) {
+        if (has('patentName')) this.editForm.patentName = record.disclosureName
+        if (has('applicationName')) this.editForm.applicationName = record.disclosureName
+      }
+      if (record.applicant && has('applicant')) this.editForm.applicant = record.applicant
+      if (record.agent && has('agent')) this.editForm.agent = record.agent
+      if (record.contactPerson && has('inventor')) this.editForm.inventor = record.contactPerson
+      if (record.manager && has('sponsor')) this.editForm.sponsor = record.manager
+
+      this.autoCompleteVisible = false
+      this.showToast('T表数据已导入，请检查并补充其他字段', 'success')
+    },
+
+    // ---- Custom fields ----
+    loadCustomFields() {
+      try {
+        const raw = localStorage.getItem(CUSTOM_FIELDS_KEY)
+        const parsed = raw ? JSON.parse(raw) : {}
+        this.customFields = {}
+        for (const name of SHEET_NAMES) {
+          this.customFields[name] = Array.isArray(parsed[name]) ? parsed[name] : []
+        }
+      } catch {
+        this.customFields = {}
+        for (const name of SHEET_NAMES) this.customFields[name] = []
+      }
+    },
+    saveCustomFieldsToStorage() {
+      localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields))
+    },
+    isCustomField(key) {
+      const customs = this.customFields[this.currentSheet] || []
+      return customs.some(f => f.key === key)
+    },
+    openCustomFieldForm() {
+      this.showCustomFieldForm = true
+      this.customFieldLabel = ''
+      this.customFieldKey = ''
+    },
+    closeCustomFieldForm() {
+      this.showCustomFieldForm = false
+      this.customFieldLabel = ''
+      this.customFieldKey = ''
+    },
+    addCustomField() {
+      const label = this.customFieldLabel.trim()
+      const key = this.customFieldKey.trim()
+      if (!label) { this.showToast('请输入字段名称', 'warning'); return }
+      if (!key) { this.showToast('请输入字段键名', 'warning'); return }
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+        this.showToast('字段键名只能包含字母、数字和下划线，且以字母或下划线开头', 'warning')
+        return
+      }
+      const existing = this.currentFields.some(f => f.key === key)
+      if (existing) { this.showToast('字段键名已存在，请换一个', 'warning'); return }
+      this.customFields[this.currentSheet].push({ key, label })
+      this.saveCustomFieldsToStorage()
+      this.closeCustomFieldForm()
+      this.showToast(`自定义字段 "${label}" 已添加`, 'success')
+    },
+    removeCustomField(key) {
+      this.customFields[this.currentSheet] = this.customFields[this.currentSheet].filter(f => f.key !== key)
+      this.saveCustomFieldsToStorage()
+      this.showToast('自定义字段已移除', 'info')
     }
   },
+
   async mounted() {
     for (const name of SHEET_NAMES) this.dataCache[name] = []
+    this.loadCustomFields()
     await this.loadAllSheetData()
   }
 }
@@ -413,7 +603,6 @@ export default {
   text-overflow: ellipsis;
   cursor: default;
 }
-
 .text-tooltip {
   position: fixed;
   z-index: 9999;
@@ -423,289 +612,53 @@ export default {
   color: #fff;
   border-radius: 4px;
   box-shadow: 0 6px 24px rgba(0,0,0,0.22);
-  user-select: text; /* 允许鼠标框选复制 */
+  user-select: text;
   word-break: break-all;
   line-height: 1.5;
   font-size: 13px;
 }
 
-
-.stats {
+/* Autocomplete dropdown */
+.autocomplete-wrapper {
+  position: relative;
+}
+.autocomplete-wrapper .form-input {
+  width: 100%;
+}
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #1a5c9e;
+  border-top: none;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.autocomplete-item {
   display: flex;
-  gap: 16px;
-  font-size: 13px;
-  color: #4a5a72;
-  background: #f7f9fc;
-  padding: 4px 14px;
-  border: 1px solid #e2e8f0;
-}
-.stat-item {
-  font-weight: 500;
-}
-.tab-nav {
-  display: flex;
-  flex-shrink: 0;
-  white-space: nowrap;
-  padding: 4px 0 0 0;
-  border-bottom: 2px solid #e9edf4;
-  margin-bottom: 6px;
-  overflow-x: auto;
-}
-.tab-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  margin-right: 4px;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 500;
-  color: #5a6e85;
-  border: 1px solid transparent;
-  border-bottom: none;
+  gap: 12px;
+  padding: 8px 12px;
   cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid #f0f3f8;
 }
-.tab-btn.active {
+.autocomplete-item:hover {
   background: #eef3fc;
+}
+.ac-no {
+  font-weight: 600;
   color: #1a5c9e;
-  font-weight: 600;
-  border-color: #dce3ed;
-  border-bottom-color: #1a5c9e;
-  border-bottom-width: 3px;
+  white-space: nowrap;
+  min-width: 100px;
 }
-.badge {
-  background: #dce3ed;
-  color: #3d5270;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 0 8px;
-  margin-left: 6px;
-  border: 1px solid #c8d2de;
-}
-.tab-btn.active .badge {
-  background: #1a5c9e;
-  color: #fff;
-  border-color: #1a5c9e;
-}
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 4px 0 6px 0;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.search-box {
-  display: flex;
-  align-items: center;
-  background: #f5f7fb;
-  border: 1px solid #dce3ed;
-  padding: 0 12px;
-  flex: 1 1 200px;
-  max-width: 320px;
-  height: 36px;
-}
-.search-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  height: 100%;
-  color: #1a2332;
-}
-.clear-btn {
-  color: #8a9bb0;
-  font-size: 14px;
-  padding-left: 6px;
-  cursor: pointer;
-}
-.actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.btn {
-  padding: 6px 16px;
-  border: 1px solid transparent;
-  font-size: 13px;
-  font-weight: 500;
-  background: transparent;
-  cursor: pointer;
-}
-.btn.primary {
-  background: #1a5c9e;
-  color: #fff;
-  border-color: #1a5c9e;
-}
-.btn.primary:hover { background: #134a80; }
-.btn.outline {
-  border-color: #d0d9e5;
+.ac-name {
   color: #4a5a72;
-}
-.btn.outline:hover { background: #f0f4fa; }
-.btn.warning {
-  background: #e67e22;
-  color: #fff;
-  border-color: #e67e22;
-}
-.btn.danger {
-  background: #c0392b;
-  color: #fff;
-  border-color: #c0392b;
-}
-.btn.sm {
-  padding: 2px 10px;
-  font-size: 12px;
-  margin: 2px 0;
-}
-.table-wrapper {
-  flex: 1;
-  overflow: hidden;
-  margin-top: 4px;
-}
-.table-scroll {
-  overflow: auto;
-  width: 100%;
-  height: 100%;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  border: 1px solid #bcc8d6;
-}
-thead {
-  background: #eef3fc;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-th {
-  padding: 8px 6px;
-  text-align: left;
-  font-weight: 600;
-  color: #1a3a5c;
-  border: 1px solid #c8d4e2;
-  white-space: nowrap;
-  font-size: 12px;
-}
-td {
-  padding: 6px 6px;
-  border: 1px solid #dce3ed;
-  color: #1e2d42;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
-}
-.col-actions {
-  text-align: center;
   white-space: nowrap;
 }
-.empty-row {
-  text-align: center;
-  padding: 40px 0;
-  color: #8a9bb0;
-  font-size: 15px;
-}
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-.modal {
-  background: #fff;
-  max-width: 600px;
-  width: 92%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-  border: 1px solid #d0d9e5;
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 20px;
-  border-bottom: 1px solid #e9edf4;
-}
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #0b2b4a;
-}
-.modal-close {
-  font-size: 28px;
-  color: #8a9bb0;
-  padding: 0 6px;
-  cursor: pointer;
-}
-.modal-body {
-  padding: 16px 20px;
-  overflow-y: auto;
-  flex: 1;
-}
-.form-group {
-  margin-bottom: 12px;
-  display: flex;
-  flex-direction: column;
-}
-.form-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #2c405a;
-  margin-bottom: 4px;
-}
-.form-input {
-  padding: 8px 12px;
-  border: 1px solid #dce3ed;
-  font-size: 14px;
-  background: #fafcfe;
-  color: #1a2332;
-}
-.form-input:focus {
-  border-color: #1a5c9e;
-  outline: none;
-}
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 20px;
-  border-top: 1px solid #e9edf4;
-  background: #fafcfe;
-}
-.toast {
-  position: fixed;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1a2332;
-  color: #fff;
-  padding: 12px 28px;
-  font-size: 14px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-  z-index: 9999;
-  transition: opacity 0.4s;
-  opacity: 0;
-  pointer-events: none;
-  border: 1px solid #444;
-}
-.toast.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-.toast.success { background: #1d8a4f; }
-.toast.error { background: #c0392b; }
-.toast.warning { background: #e67e22; }
-
 </style>

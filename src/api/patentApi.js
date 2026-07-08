@@ -148,3 +148,5 @@ export async function deleteRecord(sheetName, id) {
   if (result.code !== 200) throw new Error(result.message || '删除失败')
   return result
 }
+
+export { http }
