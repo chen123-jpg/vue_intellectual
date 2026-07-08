@@ -117,8 +117,7 @@ export async function fetchAllSheets(sheetNames) {
  */
 export async function createRecord(sheetName, formData) {
   const resource = SHEET_TO_RESOURCE[sheetName]
-  const data = convertKeys(formData, toSnakeCase)
-  const result = await request(`${resource}`, 'POST', data)
+  const result = await request(`${resource}`, 'POST', formData)
   if (result.code !== 200) throw new Error(result.message || '新增失败')
   return result
 }
@@ -132,8 +131,7 @@ export async function createRecord(sheetName, formData) {
  */
 export async function updateRecord(sheetName, id, formData) {
   const resource = SHEET_TO_RESOURCE[sheetName]
-  const data = convertKeys(formData, toSnakeCase)
-  const result = await request(`${resource}/${id}`, 'PUT', data)
+  const result = await request(`${resource}/${id}`, 'PUT', formData)
   if (result.code !== 200) throw new Error(result.message || '更新失败')
   return result
 }
