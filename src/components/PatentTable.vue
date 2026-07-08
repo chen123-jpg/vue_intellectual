@@ -113,7 +113,7 @@
 </template>
 
 <script>
-import { fetchSheetList, fetchAllSheets, createRecord, updateRecord, deleteRecord as apiDeleteRecord } from '../api/index.js'
+import { fetchSheetList, fetchAllSheets, createRecord, updateRecord, deleteRecord as apiDeleteRecord } from '../api/patentApi.js'
 const SHEET_CONFIGS = {
   '1-专利新申请': [
     { key: 'internalNo',      label: '内部编号' },

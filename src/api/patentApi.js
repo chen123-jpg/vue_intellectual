@@ -5,7 +5,7 @@ import axios from 'axios'
 // ============================================================
 
 /** 后端 API 基础地址 */
-const API_BASE = 'http://localhost:8080'
+const API_BASE = 'http://192.168.56.1:8080'
 
 /** 前端分类名 → 后端资源路径 */
 const SHEET_TO_RESOURCE = {
@@ -76,7 +76,7 @@ async function request(url, method, data = null) {
 export async function fetchSheetList(sheetName) {
   const resource = SHEET_TO_RESOURCE[sheetName]
   const result = await request(`${API_BASE}/${resource}?page=1&page_size=100`, 'GET')
-  if (result.code === 0) {
+  if (result.code === 200) {
     const rawList = result.data?.list || []
     return rawList.map((row) => convertKeys(row, toCamelCase))
   }
@@ -106,7 +106,7 @@ export async function createRecord(sheetName, formData) {
   const resource = SHEET_TO_RESOURCE[sheetName]
   const data = convertKeys(formData, toSnakeCase)
   const result = await request(`${API_BASE}/${resource}`, 'POST', data)
-  if (result.code !== 0) throw new Error(result.message || '新增失败')
+  if (result.code !== 200) throw new Error(result.message || '新增失败')
   return result
 }
 
@@ -121,7 +121,7 @@ export async function updateRecord(sheetName, id, formData) {
   const resource = SHEET_TO_RESOURCE[sheetName]
   const data = convertKeys(formData, toSnakeCase)
   const result = await request(`${API_BASE}/${resource}/${id}`, 'PUT', data)
-  if (result.code !== 0) throw new Error(result.message || '更新失败')
+  if (result.code !== 200) throw new Error(result.message || '更新失败')
   return result
 }
 
@@ -133,6 +133,6 @@ export async function updateRecord(sheetName, id, formData) {
  */
 export async function deleteRecord(sheetName, id) {
   const result = await request(`${API_BASE}/${SHEET_TO_RESOURCE[sheetName]}/${id}`, 'DELETE')
-  if (result.code !== 0) throw new Error(result.message || '删除失败')
+  if (result.code !== 200) throw new Error(result.message || '删除失败')
   return result
 }
