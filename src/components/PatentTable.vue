@@ -335,6 +335,7 @@ export default {
     },
     async saveRecord() {
       const data = { ...this.editForm }
+      console.log('saveRecord data:', JSON.stringify(data))
       for (const f of this.currentFields) {
         if (f.type === 'date' && data[f.key] === '') data[f.key] = null
       }
