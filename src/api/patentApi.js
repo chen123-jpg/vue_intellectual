@@ -1,19 +1,32 @@
 import axios from 'axios'
 
 // ============================================================
-// 配置
+// 全局Axios实例配置（统一UTF-8编码，兼容utf8mb4数据库）
 // ============================================================
-
 /** 后端 API 基础地址 */
-const API_BASE = 'http://192.168.56.1:8080'
+const API_BASE = 'http://localhost:8080'
+
+// 创建统一axios实例，全局编码配置
+const http = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    // 声明请求体编码为utf-8，后端正确解析中文
+    'Content-Type': 'application/json; charset=utf-8'
+  },
+  transformRequest: [(data) => {
+    if (!data) return data
+    // 不转义中文为Unicode，直接传输原始中文，适配utf8mb4
+    return JSON.stringify(data)
+  }]
+})
 
 /** 前端分类名 → 后端资源路径 */
 const SHEET_TO_RESOURCE = {
-  '1-专利新申请':               'patent-new-applications',
-  '1.2-补漏专利':               'patent-supplementaries',
-  '2-中间著变专利（有重复）':    'patent-intermediate-changes',
-  '3-PCT国际申请':              'patent-pcts',
-  '4-复审无效专利':             'patent-reexaminations'
+  '1-专利新申请': 'patent-new-applications',
+  '1.2-补漏专利': 'patent-supplementaries',
+  '2-中间著变专利（有重复）': 'patent-intermediate-changes',
+  '3-PCT国际申请': 'patent-pcts',
+  '4-复审无效专利': 'patent-reexaminations'
 }
 
 // ============================================================
@@ -55,11 +68,10 @@ function convertKeys(obj, converter) {
  * @returns {Promise<object>} 响应体
  */
 async function request(url, method, data = null) {
-  const response = await axios({
+  const response = await http({
     url,
     method,
-    data,
-    headers: { 'Content-Type': 'application/json' }
+    data
   })
   return response.data
 }
@@ -75,7 +87,7 @@ async function request(url, method, data = null) {
  */
 export async function fetchSheetList(sheetName) {
   const resource = SHEET_TO_RESOURCE[sheetName]
-  const result = await request(`${API_BASE}/${resource}?page=1&page_size=100`, 'GET')
+  const result = await request(`${resource}?page=1&page_size=100`, 'GET')
   if (result.code === 200) {
     const rawList = result.data?.list || []
     return rawList.map((row) => convertKeys(row, toCamelCase))
@@ -85,6 +97,7 @@ export async function fetchSheetList(sheetName) {
 
 /**
  * 一次性获取所有分类的专利列表
+ * @param {string[]} sheetNames - 分类名称数组
  * @returns {Promise<object>} { 分类名: 记录数组, ... }
  */
 export async function fetchAllSheets(sheetNames) {
@@ -105,7 +118,7 @@ export async function fetchAllSheets(sheetNames) {
 export async function createRecord(sheetName, formData) {
   const resource = SHEET_TO_RESOURCE[sheetName]
   const data = convertKeys(formData, toSnakeCase)
-  const result = await request(`${API_BASE}/${resource}`, 'POST', data)
+  const result = await request(`${resource}`, 'POST', data)
   if (result.code !== 200) throw new Error(result.message || '新增失败')
   return result
 }
@@ -120,7 +133,7 @@ export async function createRecord(sheetName, formData) {
 export async function updateRecord(sheetName, id, formData) {
   const resource = SHEET_TO_RESOURCE[sheetName]
   const data = convertKeys(formData, toSnakeCase)
-  const result = await request(`${API_BASE}/${resource}/${id}`, 'PUT', data)
+  const result = await request(`${resource}/${id}`, 'PUT', data)
   if (result.code !== 200) throw new Error(result.message || '更新失败')
   return result
 }
@@ -132,7 +145,8 @@ export async function updateRecord(sheetName, id, formData) {
  * @returns {Promise<object>} 后端响应
  */
 export async function deleteRecord(sheetName, id) {
-  const result = await request(`${API_BASE}/${SHEET_TO_RESOURCE[sheetName]}/${id}`, 'DELETE')
+  const resource = SHEET_TO_RESOURCE[sheetName]
+  const result = await request(`${resource}/${id}`, 'DELETE')
   if (result.code !== 200) throw new Error(result.message || '删除失败')
   return result
 }
