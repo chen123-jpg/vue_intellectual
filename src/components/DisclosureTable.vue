@@ -21,32 +21,32 @@
     <div class="table-scroll">
       <table>
         <thead>
-          <tr>
-            <th class="col-actions">操作</th>
-            <th v-for="field in allFields" :key="field.key">{{ field.label }}</th>
-          </tr>
+        <tr>
+          <th class="col-actions">操作</th>
+          <th v-for="field in allFields" :key="field.key">{{ field.label }}</th>
+        </tr>
         </thead>
         <tbody>
-          <tr v-if="filteredRows.length === 0">
-            <td :colspan="allFields.length + 1" class="empty-row">
-              {{ searchKeyword ? '没有找到匹配的记录' : '暂无数据，点击 "新增" 添加' }}
-            </td>
-          </tr>
-          <tr v-for="row in filteredRows" :key="row.id">
-            <td class="col-actions">
-              <button class="btn warning sm" @click="openEditModal(row)">编辑</button>
-              <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
-            </td>
-            <td v-for="field in allFields" :key="field.key">
-              <div
+        <tr v-if="filteredRows.length === 0">
+          <td :colspan="allFields.length + 1" class="empty-row">
+            {{ searchKeyword ? '没有找到匹配的记录' : '暂无数据，点击 "新增" 添加' }}
+          </td>
+        </tr>
+        <tr v-for="row in filteredRows" :key="row.id">
+          <td class="col-actions">
+            <button class="btn warning sm" @click="openEditModal(row)">编辑</button>
+            <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
+          </td>
+          <td v-for="field in allFields" :key="field.key">
+            <div
                 class="cell-text"
                 @mouseenter="handleCellEnter($event, formatValue(row[field.key], field.type))"
                 @mouseleave="handleCellLeave"
-              >
-                {{ field.type === 'bool' ? (row[field.key] ? '是' : '否') : formatValue(row[field.key], field.type) }}
-              </div>
-            </td>
-          </tr>
+            >
+              {{ formatValue(row[field.key], field.type) }}
+            </div>
+          </td>
+        </tr>
         </tbody>
       </table>
     </div>
@@ -54,11 +54,11 @@
 
   <!-- Cell tooltip -->
   <div
-    v-if="tooltip.show"
-    class="text-tooltip"
-    :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
-    @mouseenter="tooltipHover = true"
-    @mouseleave="tooltipHover = false"
+      v-if="tooltip.show"
+      class="text-tooltip"
+      :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
+      @mouseenter="tooltipHover = true"
+      @mouseleave="tooltipHover = false"
   >
     {{ tooltip.text }}
   </div>
@@ -73,15 +73,26 @@
       <div class="modal-body">
         <div v-for="field in formFields" :key="field.key" class="form-group">
           <label class="form-label">{{ field.label }}</label>
+          <!-- 布尔类型 -->
           <template v-if="field.type === 'bool'">
             <div class="form-checkbox">
               <input type="checkbox" v-model="editForm[field.key]" :id="'chk_' + field.key" />
               <label :for="'chk_' + field.key">{{ editForm[field.key] ? '是' : '否' }}</label>
             </div>
           </template>
+          <!-- 日期类型 -->
           <template v-else-if="field.type === 'date'">
             <input class="form-input" type="date" v-model="editForm[field.key]" />
           </template>
+          <!-- ========== 新增：选择框类型 ========== -->
+          <template v-else-if="field.type === 'select'">
+            <select class="form-input" v-model="editForm[field.key]">
+              <option v-for="opt in field.options" :key="opt.code" :value="opt.code">
+                {{ opt.desc }}
+              </option>
+            </select>
+          </template>
+          <!-- 普通文本 -->
           <template v-else>
             <input class="form-input" v-model="editForm[field.key]" :placeholder="field.label" />
           </template>
@@ -105,10 +116,34 @@ import {
   fetchAllDisclosures, createDisclosure, updateDisclosure, deleteDisclosure
 } from '../api/disclosureApi.js'
 
+// ========== 1. 专利状态选项（对应 Java 枚举） ==========
+const patentStatusOptions = [
+  { code: 0, desc: '接收交底书' },
+  { code: 1, desc: '联系发明人' },
+  { code: 2, desc: '检索交底书' },
+  { code: 3, desc: '撤回' },
+  { code: 4, desc: '打回' },
+  { code: 5, desc: '修改交底' },
+  { code: 6, desc: '一稿撰写中' },
+  { code: 7, desc: '一稿待反馈' },
+  { code: 8, desc: 'N稿撰写中' },
+  { code: 9, desc: 'N稿待反馈' },
+  { code: 10, desc: '待定稿' },
+  { code: 11, desc: '定稿待提交' },
+  { code: 12, desc: '提交待受理' },
+  { code: 13, desc: '受理' }
+]
+
+// ========== 2. 字段配置（专利状态改为 select） ==========
 const DISCLOSURE_FIELDS = [
   { key: 'tempNo',           label: '临时编号' },
   { key: 'internalNo',       label: '内部编号' },
-  { key: 'patentStatus',     label: '专利状态' },
+  {
+    key: 'patentStatus',
+    label: '专利状态',
+    type: 'select',
+    options: patentStatusOptions   // 挂载选项
+  },
   { key: 'requirement',      label: '要求' },
   { key: 'disclosureName',   label: '专利交底名称' },
   { key: 'applicant',        label: '申请人' },
@@ -119,10 +154,7 @@ const DISCLOSURE_FIELDS = [
   { key: 'disclosureDate',   label: '交底日', type: 'date' },
   { key: 'disclosureDays',   label: '交底天数' },
   { key: 'remark',           label: '备注' },
-  { key: 'contactInfo',      label: '联系人信息' },
-  { key: 'id',               label: 'ID', readonly: true },
-  { key: 'createTime',       label: '创建时间', readonly: true },
-  { key: 'updateTime',       label: '更新时间', readonly: true }
+  { key: 'contactInfo',      label: '联系人信息' }
 ]
 
 const allFields = DISCLOSURE_FIELDS
@@ -141,12 +173,19 @@ const tooltip = reactive({ show: false, x: 0, y: 0, text: '' })
 const tooltipHover = ref(false)
 const hideTimer = ref(null)
 
+// ========== 3. 搜索逻辑：支持对专利状态描述进行搜索 ==========
 const filteredRows = computed(() => {
   if (!searchKeyword.value.trim()) return rows.value
   const kw = searchKeyword.value.trim().toLowerCase()
   return rows.value.filter((row) => {
     for (const f of allFields) {
-      if (String(row[f.key] || '').toLowerCase().includes(kw)) return true
+      let val = row[f.key]
+      // 如果是 select 类型，使用描述文本参与搜索
+      if (f.type === 'select') {
+        const opt = patentStatusOptions.find(o => o.code === val)
+        val = opt ? opt.desc : ''
+      }
+      if (String(val || '').toLowerCase().includes(kw)) return true
     }
     return false
   })
@@ -158,11 +197,16 @@ const modalTitle = computed(() => {
   return modalMode.value === 'add' ? '新增交底记录' : '编辑交底记录'
 })
 
+// ========== 4. 格式化显示：select 类型显示描述 ==========
 function formatValue(value, type) {
   if (value === undefined || value === null) return ''
   if (type === 'bool') return value ? '是' : '否'
   if (type === 'date' && typeof value === 'string' && value.includes('T')) {
     return value.split('T')[0]
+  }
+  if (type === 'select') {
+    const opt = patentStatusOptions.find(o => o.code === value)
+    return opt ? opt.desc : String(value)
   }
   return String(value)
 }
@@ -197,7 +241,14 @@ function openAddModal() {
   editId.value = null
   const form = {}
   for (const f of formFields) {
-    form[f.key] = f.type === 'bool' ? false : ''
+    if (f.type === 'bool') {
+      form[f.key] = false
+    } else if (f.type === 'select') {
+      // 默认选中第一个选项（接收交底书）
+      form[f.key] = patentStatusOptions[0]?.code ?? null
+    } else {
+      form[f.key] = ''
+    }
   }
   editForm.value = form
   modalVisible.value = true
@@ -213,6 +264,9 @@ function openEditModal(row) {
       form[f.key] = !!val
     } else if (f.type === 'date' && typeof val === 'string' && val.includes('T')) {
       form[f.key] = val.split('T')[0]
+    } else if (f.type === 'select') {
+      // 直接使用数字 code
+      form[f.key] = val !== undefined && val !== null ? val : null
     } else {
       form[f.key] = val !== undefined && val !== null ? val : ''
     }
@@ -234,6 +288,7 @@ async function saveRecord() {
       if (data[f.key] === '' || data[f.key] === null) { data[f.key] = null }
       else if (!/ \d{2}:\d{2}:\d{2}$/.test(data[f.key])) { data[f.key] = data[f.key] + ' 00:00:00' }
     }
+    // select 类型无需额外处理，直接存 code
   }
   try {
     if (modalMode.value === 'add') {
@@ -254,13 +309,13 @@ function deleteRecord(row) {
   const name = row.disclosureName || row.internalNo || '未命名'
   if (!confirm(`确定要删除 "${name}" 吗？此操作不可恢复！`)) return
   deleteDisclosure(row.id)
-    .then(async () => {
-      showToast('已删除', 'success')
-      await loadData()
-    })
-    .catch((e) => {
-      showToast('请求失败: ' + e.message, 'error')
-    })
+      .then(async () => {
+        showToast('已删除', 'success')
+        await loadData()
+      })
+      .catch((e) => {
+        showToast('请求失败: ' + e.message, 'error')
+      })
 }
 
 function handleCellEnter(event, text) {
