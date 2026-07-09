@@ -154,6 +154,17 @@
             </div>
           </template>
 
+          <!-- agent/applicant select -->
+          <select
+              v-else-if="field.key === 'agent' || field.key === 'applicant'"
+              class="form-input"
+              v-model="editForm[field.key]"
+          >
+            <option value="">-- 请选择 --</option>
+            <option v-for="item in (field.key === 'agent' ? agentList : applicantList)" :key="item.id" :value="item.name">
+              {{ item.name }}
+            </option>
+          </select>
           <!-- normal text input -->
           <input
               v-else-if="field.type !== 'date'"
@@ -214,6 +225,8 @@ import {
   uploadFile, API_BASE,getFileNameFromUrl
 } from '../api/patentApi.js'
 import { fetchAllDisclosures } from '../api/disclosureApi.js'
+import { fetchAllAgents } from '../api/agentApi.js'
+import { fetchAllApplicants } from '../api/applicantApi.js'
 
 const SHEET_CONFIGS = {
   '1-专利新申请': [
@@ -341,6 +354,9 @@ const customFields = ref({})
 const showCustomFieldForm = ref(false)
 const customFieldLabel = ref('')
 const customFieldKey = ref('')
+
+const agentList = ref([])
+const applicantList = ref([])
 
 // ---- Computed ----
 const currentFields = computed(() => {
@@ -638,6 +654,19 @@ function onAutocompleteSelect(record) {
   showToast('T表数据已导入，请检查并补充其他字段', 'success')
 }
 
+// ---- Agent & Applicant management ----
+async function loadAgentList() {
+  try {
+    agentList.value = await fetchAllAgents()
+  } catch { agentList.value = [] }
+}
+
+async function loadApplicantList() {
+  try {
+    applicantList.value = await fetchAllApplicants()
+  } catch { applicantList.value = [] }
+}
+
 // ---- Custom fields ----
 function loadCustomFields() {
   try {
@@ -702,6 +731,8 @@ onMounted(async () => {
   for (const name of SHEET_NAMES) dataCache[name] = []
   loadCustomFields()
   await loadAllSheetData()
+  loadAgentList()
+  loadApplicantList()
 })
 </script>
 
