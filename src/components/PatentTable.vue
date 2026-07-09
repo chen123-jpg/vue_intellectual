@@ -791,20 +791,18 @@ onMounted(async () => {
   color: #2980b9;
 }
 .file-link {
-  color: #1a5c9e;
-  text-decoration: underline;
+  color: #1e2d42;               /* 悬停保持黑色，如需其他效果可自行调整 */
+  font-size: 13px;
+  text-decoration: none;
   cursor: pointer;
 }
-.file-link:hover { color: #134a80; }
+.file-link:hover {
+  color: #1e2d42;               /* 悬停保持黑色，如需其他效果可自行调整 */
+  font-size: 13px;
+  text-decoration: none;
+}
 .btn.sm.disabled {
   opacity: 0.5;
   pointer-events: none;
-}
-a{
-  text-decoration-color: black;
-  text-decoration: none;
-}
-a:hover{
-  text-decoration: none;
 }
 </style>
