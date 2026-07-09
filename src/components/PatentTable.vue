@@ -60,20 +60,16 @@
             <button class="btn danger sm" @click="deleteRecord(row)">删除</button>
           </td>
           <td v-for="field in currentFields" :key="field.key">
-            <div
-                v-if="field.key === 'notification' && isFilePath(row[field.key])"
-                class="cell-text"
-            >
+            <!-- ★★★ 通知字段且为文件路径 → 显示原始文件名链接 ★★★ -->
+            <div v-if="field.key === 'notification' && isFilePath(row[field.key])" class="cell-text">
               <a :href="fileViewUrl(row[field.key])" target="_blank" class="file-link">
-                📎 查看文件
+                {{ getFileNameFromUrl(row[field.key]) || '查看文件' }}
               </a>
             </div>
-            <div
-                v-else
-                class="cell-text"
-                @mouseenter="handleCellEnter($event, formatValue(row[field.key], field.type))"
-                @mouseleave="handleCellLeave"
-            >
+            <!-- 其他普通字段 -->
+            <div v-else class="cell-text"
+                 @mouseenter="handleCellEnter($event, formatValue(row[field.key], field.type))"
+                 @mouseleave="handleCellLeave">
               {{ formatValue(row[field.key], field.type) }}
             </div>
           </td>
@@ -137,7 +133,7 @@
             <div class="file-input-row">
               <input
                   class="form-input"
-                  v-model="editForm.notification"
+                  v-model="notificationDisplay"
                   :placeholder="field.label + '（输入文本或上传文件）'"
               />
               <label class="file-upload-btn">
@@ -215,7 +211,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import {
   fetchSheetList, fetchAllSheets, createRecord,
   updateRecord, deleteRecord as apiDeleteRecord,
-  uploadFile, API_BASE
+  uploadFile, API_BASE,getFileNameFromUrl
 } from '../api/patentApi.js'
 import { fetchAllDisclosures } from '../api/disclosureApi.js'
 
@@ -378,6 +374,20 @@ const modalTitle = computed(() => {
     : `编辑记录 - ${currentSheet.value}`
 })
 
+// 新增计算属性
+const notificationDisplay = computed({
+  get: () => {
+    const val = editForm.value.notification
+    if (val && isFilePath(val)) {
+      return getFileNameFromUrl(val) || val
+    }
+    return val || ''
+  },
+  set: (newVal) => {
+    editForm.value.notification = newVal
+  }
+})
+
 // ---- Methods ----
 function showToast(message, type = 'info') {
   toastMessage.value = message
@@ -472,7 +482,15 @@ function openEditModal(row) {
   editForm.value = form
   autoCompleteVisible.value = false
   autoCompleteItems.value = []
-  notificationFileName.value = ''
+
+  // ★★★ 提取文件名显示到提示 ★★★
+  const noti = row.notification
+  if (noti && isFilePath(noti)) {
+    notificationFileName.value = getFileNameFromUrl(noti) || '未知文件'
+  } else {
+    notificationFileName.value = ''
+  }
+
   modalVisible.value = true
   tooltip.show = false
   tooltipHover.value = false
@@ -529,9 +547,12 @@ async function onNotificationFileChange(e) {
   if (!file) return
   notificationUploading.value = true
   try {
-    const result = await uploadFile(file)
-    editForm.value.notification = result.path
-    notificationFileName.value = result.name
+    // uploadFile 现在返回字符串 URL（如 "/files/abc.pdf?name=xxx"）
+    const url = await uploadFile(file)
+    // 直接赋值给 notification 字段
+    editForm.value.notification = url
+    // 从 URL 中解析原始文件名，若解析失败则回退为 file.name
+    notificationFileName.value = getFileNameFromUrl(url) || file.name
     showToast('文件上传成功', 'success')
   } catch (err) {
     showToast('文件上传失败: ' + err.message, 'error')
@@ -778,5 +799,12 @@ onMounted(async () => {
 .btn.sm.disabled {
   opacity: 0.5;
   pointer-events: none;
+}
+a{
+  text-decoration-color: black;
+  text-decoration: none;
+}
+a:hover{
+  text-decoration: none;
 }
 </style>

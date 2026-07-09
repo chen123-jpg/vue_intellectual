@@ -152,22 +152,38 @@ export async function deleteRecord(sheetName, id) {
 /**
  * 上传文件到后端
  * @param {File} file
- * @returns {Promise<{path: string, name: string}>}
+ * @returns {Promise<string>} 返回带文件名的 URL，如 "/files/abc.pdf?name=原始文件名.pdf"
  */
 export async function uploadFile(file) {
   const formData = new FormData()
   formData.append('file', file)
 
-  // 直接调用 axios，不设置 Content-Type，浏览器会自动生成 multipart/form-data
+  // 直接调用 axios，不设置 Content-Type，浏览器自动生成 multipart/form-data
   const response = await axios.post(`${API_BASE}/upload`, formData)
 
   if (response.data.code === 200) {
-    return {
-      path: response.data.data,  // 如 "/files/abc.pdf"
-      name: file.name
-    }
+    // 后端返回的是字符串 URL（包含 ?name=...）
+    return response.data.data
   }
   throw new Error(response.data.message || '上传失败')
+}
+
+/**
+ * 从文件 URL 中解析原始文件名（?name=xxx）
+ * @param {string} url - 如 "/files/abc.pdf?name=原始文件名.pdf"
+ * @returns {string|null} 原始文件名，若不存在返回 null
+ */
+export function getFileNameFromUrl(url) {
+  if (!url || typeof url !== 'string') return null
+  try {
+    const queryIndex = url.indexOf('?')
+    if (queryIndex === -1) return null
+    const queryString = url.substring(queryIndex + 1)
+    const params = new URLSearchParams(queryString)
+    return params.get('name')
+  } catch {
+    return null
+  }
 }
 
 // 导出 http 和 API_BASE，供外部使用
