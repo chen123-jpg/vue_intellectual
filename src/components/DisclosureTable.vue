@@ -92,6 +92,15 @@
               </option>
             </select>
           </template>
+          <!-- 代理人/申请人：下拉选择 -->
+          <template v-else-if="field.key === 'agent' || field.key === 'applicant'">
+            <select class="form-input" v-model="editForm[field.key]">
+              <option value="">-- 请选择 --</option>
+              <option v-for="item in (field.key === 'agent' ? agentList : applicantList)" :key="item.id" :value="item.name">
+                {{ item.name }}
+              </option>
+            </select>
+          </template>
           <!-- 普通文本 -->
           <template v-else>
             <input class="form-input" v-model="editForm[field.key]" :placeholder="field.label" />
@@ -115,6 +124,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import {
   fetchAllDisclosures, createDisclosure, updateDisclosure, deleteDisclosure
 } from '../api/disclosureApi.js'
+import { fetchAllAgents } from '../api/agentApi.js'
+import { fetchAllApplicants } from '../api/applicantApi.js'
 
 // ========== 1. 专利状态选项（对应 Java 枚举） ==========
 const patentStatusOptions = [
@@ -172,6 +183,9 @@ const toastTimer = ref(null)
 const tooltip = reactive({ show: false, x: 0, y: 0, text: '' })
 const tooltipHover = ref(false)
 const hideTimer = ref(null)
+
+const agentList = ref([])
+const applicantList = ref([])
 
 // ========== 3. 搜索逻辑：支持对专利状态描述进行搜索 ==========
 const filteredRows = computed(() => {
@@ -318,6 +332,15 @@ function deleteRecord(row) {
       })
 }
 
+// ---- Agent & Applicant management ----
+async function loadAgentList() {
+  try { agentList.value = await fetchAllAgents() } catch { agentList.value = [] }
+}
+
+async function loadApplicantList() {
+  try { applicantList.value = await fetchAllApplicants() } catch { applicantList.value = [] }
+}
+
 function handleCellEnter(event, text) {
   const el = event.currentTarget
   if (el.scrollWidth <= el.clientWidth) return
@@ -338,6 +361,8 @@ function handleCellLeave() {
 
 onMounted(async () => {
   await loadData()
+  loadAgentList()
+  loadApplicantList()
 })
 </script>
 
