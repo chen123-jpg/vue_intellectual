@@ -3,8 +3,22 @@ import axios from 'axios'
 /** 后端地址（与 Spring Boot 一致） */
 export const API_BASE = 'http://localhost:8080'
 
+const TOKEN_KEY = 'auth_token'
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
 /**
- * 统一 HTTP：JSON + Cookie 会话（登录后邮件等接口需要）
+ * 统一 HTTP：token 鉴权
  */
 export const http = axios.create({
   baseURL: API_BASE,
@@ -16,6 +30,13 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
+  // 所有请求自动附带 token
+  const token = getToken()
+  if (token) {
+    if (!config.params) config.params = {}
+    config.params.token = token
+  }
+
   // FormData 让浏览器自动带 multipart boundary
   if (config.data instanceof FormData) {
     if (config.headers) {

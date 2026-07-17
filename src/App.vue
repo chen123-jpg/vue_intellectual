@@ -27,7 +27,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { http } from './api/http.js'
+import { http, getToken, clearToken } from './api/http.js'
 import Auth from './components/Auth.vue'
 import PatentTable from './components/PatentTable.vue'
 import DisclosureTable from './components/DisclosureTable.vue'
@@ -37,22 +37,23 @@ const isLoggedIn = ref(false)
 const activeTab = ref('workflow')
 
 const checkLogin = async () => {
+  if (!getToken()) {
+    isLoggedIn.value = false
+    return
+  }
   try {
-    await http.get('/api/user/me')
+    await http.get('/api/account/me')
     isLoggedIn.value = true
   } catch {
+    clearToken()
     isLoggedIn.value = false
   }
 }
 
 onMounted(() => checkLogin())
 
-const logout = async () => {
-  try {
-    await http.post('/api/user/logout')
-  } catch {
-    // ignore
-  }
+const logout = () => {
+  clearToken()
   isLoggedIn.value = false
   activeTab.value = 'workflow'
 }

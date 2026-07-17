@@ -344,10 +344,7 @@
                   <el-button style="margin-left:8px" @click="loadPreview">加载预览</el-button>
                 </el-form-item>
                 <el-form-item label="收件人">
-                  <el-input v-model="mailForm.toEmails" placeholder="多个用逗号分隔" />
-                </el-form-item>
-                <el-form-item label="抄送">
-                  <el-input v-model="mailForm.ccEmails" />
+                  <el-input v-model="mailForm.toEmail" placeholder="请输入收件人邮箱" />
                 </el-form-item>
                 <el-form-item label="主题">
                   <el-input v-model="mailForm.subject" />
@@ -355,15 +352,25 @@
                 <el-form-item label="正文">
                   <el-input v-model="mailForm.content" type="textarea" :rows="8" />
                 </el-form-item>
-                <el-form-item label="附件">
-                  <el-checkbox-group v-model="mailForm.attachmentIds">
-                    <el-checkbox v-for="a in detail.attachments || []" :key="a.id" :label="a.id">
-                      {{ a.fileName }} ({{ a.bizType === 'DISCLOSURE_DOC' ? '交底书' : '其他' }})
-                    </el-checkbox>
-                  </el-checkbox-group>
+                <el-form-item label="授权码">
+                  <el-input v-model="mailForm.authCode" placeholder="邮箱SMTP授权码（可选）" />
                 </el-form-item>
-                <el-button type="primary" :loading="saving" @click="sendMail">发送邮件</el-button>
-                <div class="hint">需已登录且账号配置了 SMTP 授权码</div>
+                <el-form-item label="附件">
+                  <input
+                    type="file"
+                    multiple
+                    ref="mailAttachmentInput"
+                    @change="onMailAttachChange"
+                    style="display: none"
+                  />
+                  <el-button @click="$refs.mailAttachmentInput.click()">选择文件</el-button>
+                  <span v-if="mailForm.attachments.length" style="margin-left:8px;color:#909399">
+                    已选 {{ mailForm.attachments.length }} 个文件
+                  </span>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" :loading="saving" @click="sendMail">发送邮件</el-button>
+                </el-form-item>
               </el-form>
               <h4 class="mt12">发送记录</h4>
               <el-table :data="detail.mailLogs || []" size="small" border>
@@ -436,11 +443,11 @@ const nextStatus = ref('')
 const statusRemark = ref('')
 const mailForm = reactive({
   templateCode: 'DISCLOSURE_CONTACT',
-  toEmails: '',
-  ccEmails: '',
+  toEmail: '',
   subject: '',
   content: '',
-  attachmentIds: []
+  authCode: '',
+  attachments: []
 })
 
 const detailTitle = computed(() => {
@@ -603,13 +610,11 @@ async function openDetail(row) {
     nextStatus.value = String(data.disclosure.patentStatus ?? '')
     statusRemark.value = ''
     mailForm.templateCode = 'DISCLOSURE_CONTACT'
-    mailForm.toEmails = data.disclosure.contactEmail || ''
-    mailForm.ccEmails = ''
+    mailForm.toEmail = data.disclosure.contactEmail || ''
     mailForm.subject = ''
     mailForm.content = ''
-    mailForm.attachmentIds = (data.attachments || [])
-      .filter((a) => a.bizType === 'DISCLOSURE_DOC')
-      .map((a) => a.id)
+    mailForm.authCode = ''
+    mailForm.attachments = []
     await loadPreview()
   } catch (e) {
     ElMessage.error(e.message || '加载详情失败')
@@ -787,27 +792,29 @@ async function loadPreview() {
   }
 }
 
+function onMailAttachChange(e) {
+  mailForm.attachments = Array.from(e.target.files || [])
+}
+
 async function sendMail() {
-  if (!mailForm.toEmails?.trim()) {
+  if (!mailForm.toEmail?.trim()) {
     ElMessage.warning('请填写收件人')
     return
   }
   saving.value = true
   try {
     await sendWorkflowMail({
-      disclosureId: detail.value.disclosure.id,
-      templateCode: mailForm.templateCode || undefined,
-      toEmails: mailForm.toEmails,
-      ccEmails: mailForm.ccEmails || undefined,
+      to: mailForm.toEmail,
       subject: mailForm.subject,
-      content: mailForm.content,
-      attachmentIds: mailForm.attachmentIds,
-      senderName: '前端用户'
+      text: mailForm.content,
+      attachments: mailForm.attachments,
+      authCode: mailForm.authCode || undefined
     })
     ElMessage.success('发送成功')
+    mailForm.attachments = []
     await refreshDetail()
   } catch (e) {
-    ElMessage.error(e.message || '发送失败（请确认已登录且 SMTP 配置正确）')
+    ElMessage.error(e.message || '发送失败')
   } finally {
     saving.value = false
   }

@@ -1,4 +1,4 @@
-import { http, unwrap, API_BASE } from './http.js'
+import { http, unwrap, API_BASE, getToken } from './http.js'
 
 const BASE = '/api/disclosure-workflow'
 
@@ -90,8 +90,18 @@ export async function previewMailTemplate(code, disclosureId) {
   }))
 }
 
-export async function sendWorkflowMail(payload) {
-  return unwrap(await http.post(`${BASE}/mail/send`, payload))
+export async function sendWorkflowMail({ to, subject, text, attachments, authCode }) {
+  const fd = new FormData()
+  const token = getToken()
+  if (token) fd.append('token', token)
+  fd.append('to', to)
+  fd.append('subject', subject)
+  fd.append('text', text)
+  if (authCode) fd.append('auth_code', authCode)
+  if (attachments && attachments.length) {
+    attachments.forEach((file) => fd.append('attachments', file))
+  }
+  return unwrap(await http.post('/api/mail/send', fd))
 }
 
 export async function listMailLogs(id) {
