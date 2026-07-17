@@ -1,24 +1,6 @@
-import axios from 'axios'
+import { http, API_BASE } from './http.js'
 
-// ============================================================
-// 全局Axios实例配置（统一UTF-8编码，兼容utf8mb4数据库）
-// ============================================================
-/** 后端 API 基础地址 */
-const API_BASE = 'http://localhost:8080'
-
-// 创建统一axios实例，全局编码配置
-const http = axios.create({
-  baseURL: API_BASE,
-  headers: {
-    // 声明请求体编码为utf-8，后端正确解析中文
-    'Content-Type': 'application/json; charset=utf-8'
-  },
-  transformRequest: [(data) => {
-    if (!data) return data
-    // 不转义中文为Unicode，直接传输原始中文，适配utf8mb4
-    return JSON.stringify(data)
-  }]
-})
+// 兼容旧引用：业务请求统一走 http（含 Cookie）
 
 /** 前端分类名 → 后端资源路径 */
 const SHEET_TO_RESOURCE = {
@@ -157,12 +139,8 @@ export async function deleteRecord(sheetName, id) {
 export async function uploadFile(file) {
   const formData = new FormData()
   formData.append('file', file)
-
-  // 直接调用 axios，不设置 Content-Type，浏览器自动生成 multipart/form-data
-  const response = await axios.post(`${API_BASE}/upload`, formData)
-
+  const response = await http.post('/upload', formData)
   if (response.data.code === 200) {
-    // 后端返回的是字符串 URL（包含 ?name=...）
     return response.data.data
   }
   throw new Error(response.data.message || '上传失败')

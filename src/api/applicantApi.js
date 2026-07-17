@@ -1,4 +1,4 @@
-import { http } from './patentApi.js'
+import { http } from './http.js'
 
 export async function fetchAllApplicants() {
   const response = await http.get('/applicants')

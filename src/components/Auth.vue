@@ -1,13 +1,25 @@
 <template>
   <div class="auth-container">
-    <el-tabs v-model="activeTab" type="border-card">
+    <el-tabs v-model="activeTab" type="border-card" @tab-change="onTabChange">
       <el-tab-pane label="登录" name="login">
         <el-form :model="loginForm" label-width="80px">
           <el-form-item label="邮箱">
             <el-input v-model="loginForm.email" placeholder="请输入邮箱" />
           </el-form-item>
           <el-form-item label="密码">
-            <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" />
+            <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" show-password />
+          </el-form-item>
+          <el-form-item label="验证码">
+            <div class="captcha-row">
+              <el-input v-model="loginForm.checkCode" placeholder="请输入验证码" style="width: 180px" />
+              <img
+                v-if="checkCodeImage"
+                :src="checkCodeImage"
+                class="captcha-img"
+                title="点击刷新"
+                @click="fetchCheckCode"
+              />
+            </div>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleLogin" :loading="loading">登录</el-button>
@@ -15,27 +27,32 @@
         </el-form>
       </el-tab-pane>
       <el-tab-pane label="注册" name="register">
-        <el-form :model="regForm" label-width="100px">
+        <el-form :model="regForm" label-width="80px">
+          <el-form-item label="昵称">
+            <el-input v-model="regForm.nickName" placeholder="请输入昵称" />
+          </el-form-item>
           <el-form-item label="邮箱">
             <el-input v-model="regForm.email" placeholder="邮箱（登录账号）" />
           </el-form-item>
           <el-form-item label="密码">
-            <el-input v-model="regForm.password" type="password" placeholder="密码" />
+            <el-input v-model="regForm.password" type="password" placeholder="密码" show-password />
           </el-form-item>
           <el-form-item label="授权码">
             <el-input v-model="regForm.authCode" placeholder="邮箱SMTP授权码" />
           </el-form-item>
-          <el-collapse style="width: 100%">
-            <el-collapse-item title="高级设置（企业邮箱等）" name="1">
-              <el-form-item label="SMTP服务器">
-                <el-input v-model="regForm.smtpHost" placeholder="例如 smtp.example.com（可选）" />
-              </el-form-item>
-              <el-form-item label="端口">
-                <el-input-number v-model="regForm.smtpPort" :min="1" :max="65535" placeholder="例如 587" />
-              </el-form-item>
-            </el-collapse-item>
-          </el-collapse>
-          <el-form-item style="margin-top: 15px">
+          <el-form-item label="验证码">
+            <div class="captcha-row">
+              <el-input v-model="regForm.checkCode" placeholder="请输入验证码" style="width: 180px" />
+              <img
+                v-if="checkCodeImage"
+                :src="checkCodeImage"
+                class="captcha-img"
+                title="点击刷新"
+                @click="fetchCheckCode"
+              />
+            </div>
+          </el-form-item>
+          <el-form-item>
             <el-button type="success" @click="handleRegister" :loading="loading">注册</el-button>
           </el-form-item>
         </el-form>
@@ -45,68 +62,95 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import axios from 'axios'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { http, unwrap, setToken } from '../api/http.js'
 
 const emit = defineEmits(['login-success'])
 
 const activeTab = ref('login')
 const loading = ref(false)
+const checkCodeKey = ref('')
+const checkCodeImage = ref('')
 
 const loginForm = reactive({
   email: '',
-  password: ''
+  password: '',
+  checkCode: ''
 })
 
 const regForm = reactive({
+  nickName: '',
   email: '',
   password: '',
   authCode: '',
-  smtpHost: '',
-  smtpPort: null
+  checkCode: ''
 })
 
+async function fetchCheckCode() {
+  try {
+    const params = {}
+    if (checkCodeKey.value) params.oldCheckCodeKey = checkCodeKey.value
+    const data = await unwrap(await http.get('/api/account/checkCode', { params }))
+    checkCodeImage.value = data.checkCode
+    checkCodeKey.value = data.checkCodeKey
+  } catch (err) {
+    ElMessage.error('获取验证码失败')
+  }
+}
+
+onMounted(() => fetchCheckCode())
+
+function onTabChange() {
+  fetchCheckCode()
+}
+
 const handleLogin = async () => {
-  if (!loginForm.email || !loginForm.password) {
+  if (!loginForm.email || !loginForm.password || !loginForm.checkCode) {
     ElMessage.warning('请填写完整信息')
     return
   }
   loading.value = true
   try {
-    const params = new URLSearchParams()
-    params.append('email', loginForm.email)
-    params.append('password', loginForm.password)
-    await axios.post('/api/user/login', params)
+    const data = await unwrap(await http.post('/api/account/login', {
+      checkCodeKey: checkCodeKey.value,
+      checkCode: loginForm.checkCode,
+      email: loginForm.email,
+      password: loginForm.password
+    }))
+    setToken(data.token)
     ElMessage.success('登录成功')
     emit('login-success')
   } catch (err) {
-    ElMessage.error(err.response?.data?.error || '登录失败')
+    ElMessage.error(err.message || '登录失败')
+    fetchCheckCode()
   } finally {
     loading.value = false
   }
 }
 
 const handleRegister = async () => {
-  if (!regForm.email || !regForm.password || !regForm.authCode) {
-    ElMessage.warning('请填写邮箱、密码和授权码')
+  if (!regForm.nickName || !regForm.email || !regForm.password || !regForm.authCode || !regForm.checkCode) {
+    ElMessage.warning('请填写完整信息')
     return
   }
   loading.value = true
   try {
-    const params = new URLSearchParams()
-    params.append('email', regForm.email)
-    params.append('password', regForm.password)
-    params.append('authCode', regForm.authCode)
-    if (regForm.smtpHost) params.append('smtpHost', regForm.smtpHost)
-    if (regForm.smtpPort) params.append('smtpPort', regForm.smtpPort)
-    await axios.post('/api/user/register', params)
+    await unwrap(await http.post('/api/account/register', {
+      checkCodeKey: checkCodeKey.value,
+      checkCode: regForm.checkCode,
+      email: regForm.email,
+      password: regForm.password,
+      nickName: regForm.nickName,
+      auth_code: regForm.authCode
+    }))
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
-    // 清空注册表单
-    Object.assign(regForm, { email: '', password: '', authCode: '', smtpHost: '', smtpPort: null })
+    Object.assign(regForm, { nickName: '', email: '', password: '', authCode: '', checkCode: '' })
+    fetchCheckCode()
   } catch (err) {
-    ElMessage.error(err.response?.data?.error || '注册失败')
+    ElMessage.error(err.message || '注册失败')
+    fetchCheckCode()
   } finally {
     loading.value = false
   }
@@ -117,5 +161,16 @@ const handleRegister = async () => {
 .auth-container {
   max-width: 500px;
   margin: 40px auto;
+}
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.captcha-img {
+  height: 38px;
+  cursor: pointer;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
 }
 </style>
