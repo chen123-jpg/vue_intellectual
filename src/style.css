@@ -357,19 +357,6 @@ td {
 .toast.error { background: #c0392b; }
 .toast.warning { background: #e67e22; }
 
-/* Custom field remove button */
-.remove-field-btn {
-  display: inline-block;
-  margin-left: 4px;
-  color: #c0392b;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  padding: 0 3px;
-  line-height: 1;
-}
-.remove-field-btn:hover { color: #e74c3c; }
-
 /* Checkbox style */
 .form-checkbox {
   display: flex;

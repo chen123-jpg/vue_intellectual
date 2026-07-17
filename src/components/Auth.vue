@@ -7,7 +7,7 @@
             <el-input v-model="loginForm.email" placeholder="请输入邮箱" />
           </el-form-item>
           <el-form-item label="密码">
-            <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" />
+            <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" show-password />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleLogin" :loading="loading">登录</el-button>
@@ -20,7 +20,7 @@
             <el-input v-model="regForm.email" placeholder="邮箱（登录账号）" />
           </el-form-item>
           <el-form-item label="密码">
-            <el-input v-model="regForm.password" type="password" placeholder="密码" />
+            <el-input v-model="regForm.password" type="password" placeholder="密码" show-password />
           </el-form-item>
           <el-form-item label="授权码">
             <el-input v-model="regForm.authCode" placeholder="邮箱SMTP授权码" />
@@ -31,7 +31,7 @@
                 <el-input v-model="regForm.smtpHost" placeholder="例如 smtp.example.com（可选）" />
               </el-form-item>
               <el-form-item label="端口">
-                <el-input-number v-model="regForm.smtpPort" :min="1" :max="65535" placeholder="例如 587" />
+                <el-input-number v-model="regForm.smtpPort" :min="1" :max="65535" />
               </el-form-item>
             </el-collapse-item>
           </el-collapse>
@@ -46,8 +46,9 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { API_BASE } from '../api/http.js'
+import axios from 'axios'
 
 const emit = defineEmits(['login-success'])
 
@@ -67,6 +68,12 @@ const regForm = reactive({
   smtpPort: null
 })
 
+// 登录/注册走后端同源 Cookie（与业务 API 同域 localhost:8080）
+const authHttp = axios.create({
+  baseURL: API_BASE,
+  withCredentials: true
+})
+
 const handleLogin = async () => {
   if (!loginForm.email || !loginForm.password) {
     ElMessage.warning('请填写完整信息')
@@ -77,7 +84,9 @@ const handleLogin = async () => {
     const params = new URLSearchParams()
     params.append('email', loginForm.email)
     params.append('password', loginForm.password)
-    await axios.post('/api/user/login', params)
+    await authHttp.post('/api/user/login', params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
     ElMessage.success('登录成功')
     emit('login-success')
   } catch (err) {
@@ -100,13 +109,14 @@ const handleRegister = async () => {
     params.append('authCode', regForm.authCode)
     if (regForm.smtpHost) params.append('smtpHost', regForm.smtpHost)
     if (regForm.smtpPort) params.append('smtpPort', regForm.smtpPort)
-    await axios.post('/api/user/register', params)
+    await authHttp.post('/api/user/register', params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
-    // 清空注册表单
     Object.assign(regForm, { email: '', password: '', authCode: '', smtpHost: '', smtpPort: null })
   } catch (err) {
-    ElMessage.error(err.response?.data?.error || '注册失败')
+    ElMessage.error(err.response?.data?.error || err.response?.data?.message || '注册失败')
   } finally {
     loading.value = false
   }

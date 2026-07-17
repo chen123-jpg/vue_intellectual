@@ -129,20 +129,21 @@ import { fetchAllApplicants } from '../api/applicantApi.js'
 
 // ========== 1. 专利状态选项（对应 Java 枚举） ==========
 const patentStatusOptions = [
-  { code: 0, desc: '接收交底书' },
-  { code: 1, desc: '联系发明人' },
-  { code: 2, desc: '检索交底书' },
-  { code: 3, desc: '撤回' },
-  { code: 4, desc: '打回' },
-  { code: 5, desc: '修改交底' },
-  { code: 6, desc: '一稿撰写中' },
-  { code: 7, desc: '一稿待反馈' },
-  { code: 8, desc: 'N稿撰写中' },
-  { code: 9, desc: 'N稿待反馈' },
-  { code: 10, desc: '待定稿' },
-  { code: 11, desc: '定稿待提交' },
-  { code: 12, desc: '提交待受理' },
-  { code: 13, desc: '受理' }
+  { code: '0', desc: '接收交底书' },
+  { code: '1', desc: '联系发明人' },
+  { code: '2', desc: '检索交底书' },
+  { code: '3', desc: '撤回' },
+  { code: '4', desc: '打回' },
+  { code: '5', desc: '修改交底' },
+  { code: '6', desc: '一稿撰写中' },
+  { code: '7', desc: '一稿待反馈' },
+  { code: '8', desc: 'N稿撰写中' },
+  { code: '9', desc: 'N稿待反馈' },
+  { code: '10', desc: '待定稿' },
+  { code: '11', desc: '定稿' },
+  { code: '12', desc: '定稿待报' },
+  { code: '13', desc: '提交待受理' },
+  { code: '14', desc: '受理' }
 ]
 
 // ========== 2. 字段配置（专利状态改为 select） ==========

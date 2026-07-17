@@ -1,8 +1,14 @@
-import { http } from './patentApi.js'
+import { http } from './http.js'
+import { searchDisclosures as searchWorkflowDisclosures } from './disclosureWorkflowApi.js'
 
+/** 优先走交底流程查询；失败时回退旧接口 */
 export async function fetchAllDisclosures() {
-  const response = await http.get('/patent-disclosure')
-  return response.data
+  try {
+    return await searchWorkflowDisclosures({})
+  } catch {
+    const response = await http.get('/patent-disclosure')
+    return response.data
+  }
 }
 
 export async function fetchDisclosurePage(pageNum = 1, pageSize = 10) {

@@ -27,7 +27,6 @@
     </div>
     <div class="actions">
       <button class="btn primary" @click="openAddModal">新增</button>
-      <button class="btn outline" @click="openCustomFieldForm">添加字段</button>
       <button class="btn outline" @click="refreshData">刷新</button>
     </div>
   </div>
@@ -40,11 +39,6 @@
           <th class="col-actions">操作</th>
           <th v-for="field in currentFields" :key="field.key">
             {{ field.label }}
-            <span
-                v-if="isCustomField(field.key)"
-                class="remove-field-btn"
-                @click="removeCustomField(field.key)"
-            >&times;</span>
           </th>
         </tr>
         </thead>
@@ -188,30 +182,6 @@
     </div>
   </div>
 
-  <!-- Custom field modal -->
-  <div v-if="showCustomFieldForm" class="modal-overlay" @click.self="closeCustomFieldForm">
-    <div class="modal" style="max-width:420px">
-      <div class="modal-header">
-        <span class="modal-title">添加自定义字段 - {{ currentSheet }}</span>
-        <span class="modal-close" @click="closeCustomFieldForm">&times;</span>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">字段名称（中文显示名）</label>
-          <input class="form-input" v-model="customFieldLabel" placeholder="如：优先级" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">字段键名（英文标识）</label>
-          <input class="form-input" v-model="customFieldKey" placeholder="如：custom_priority" />
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn outline" @click="closeCustomFieldForm">取消</button>
-        <button class="btn primary" @click="addCustomField">确认添加</button>
-      </div>
-    </div>
-  </div>
-
   <div class="toast" :class="[toastType, { show: toastMessage }]">
     {{ toastMessage }}
   </div>
@@ -323,7 +293,6 @@ const SHEET_CONFIGS = {
 }
 
 const SHEET_NAMES = Object.keys(SHEET_CONFIGS)
-const CUSTOM_FIELDS_KEY = 'patent_custom_fields'
 const sheetNames = SHEET_NAMES
 
 // ---- Reactive state ----
@@ -350,19 +319,12 @@ const autoCompleteBlurTimer = ref(null)
 const notificationUploading = ref(false)
 const notificationFileName = ref('')
 
-const customFields = ref({})
-const showCustomFieldForm = ref(false)
-const customFieldLabel = ref('')
-const customFieldKey = ref('')
-
 const agentList = ref([])
 const applicantList = ref([])
 
 // ---- Computed ----
 const currentFields = computed(() => {
-  const base = SHEET_CONFIGS[currentSheet.value] || []
-  const customs = customFields.value[currentSheet.value] || []
-  return [...base, ...customs]
+  return SHEET_CONFIGS[currentSheet.value] || []
 })
 
 const currentRows = computed(() => dataCache[currentSheet.value] || [])
@@ -667,69 +629,9 @@ async function loadApplicantList() {
   } catch { applicantList.value = [] }
 }
 
-// ---- Custom fields ----
-function loadCustomFields() {
-  try {
-    const raw = localStorage.getItem(CUSTOM_FIELDS_KEY)
-    const parsed = raw ? JSON.parse(raw) : {}
-    customFields.value = {}
-    for (const name of SHEET_NAMES) {
-      customFields.value[name] = Array.isArray(parsed[name]) ? parsed[name] : []
-    }
-  } catch {
-    customFields.value = {}
-    for (const name of SHEET_NAMES) customFields.value[name] = []
-  }
-}
-
-function saveCustomFieldsToStorage() {
-  localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(customFields.value))
-}
-
-function isCustomField(key) {
-  const customs = customFields.value[currentSheet.value] || []
-  return customs.some(f => f.key === key)
-}
-
-function openCustomFieldForm() {
-  showCustomFieldForm.value = true
-  customFieldLabel.value = ''
-  customFieldKey.value = ''
-}
-
-function closeCustomFieldForm() {
-  showCustomFieldForm.value = false
-  customFieldLabel.value = ''
-  customFieldKey.value = ''
-}
-
-function addCustomField() {
-  const label = customFieldLabel.value.trim()
-  const key = customFieldKey.value.trim()
-  if (!label) { showToast('请输入字段名称', 'warning'); return }
-  if (!key) { showToast('请输入字段键名', 'warning'); return }
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
-    showToast('字段键名只能包含字母、数字和下划线，且以字母或下划线开头', 'warning')
-    return
-  }
-  const existing = currentFields.value.some(f => f.key === key)
-  if (existing) { showToast('字段键名已存在，请换一个', 'warning'); return }
-  customFields.value[currentSheet.value].push({ key, label })
-  saveCustomFieldsToStorage()
-  closeCustomFieldForm()
-  showToast(`自定义字段 "${label}" 已添加`, 'success')
-}
-
-function removeCustomField(key) {
-  customFields.value[currentSheet.value] = customFields.value[currentSheet.value].filter(f => f.key !== key)
-  saveCustomFieldsToStorage()
-  showToast('自定义字段已移除', 'info')
-}
-
 // ---- Lifecycle ----
 onMounted(async () => {
   for (const name of SHEET_NAMES) dataCache[name] = []
-  loadCustomFields()
   await loadAllSheetData()
   loadAgentList()
   loadApplicantList()

@@ -2,34 +2,43 @@
   <Auth v-if="!isLoggedIn" @login-success="checkLogin" />
   <template v-else>
     <div class="top-tab-nav">
-      <div class="top-tab-btn" :class="{ active: activeTab === 'disclosure' }"
-           @click="activeTab = 'disclosure'">T表交底信息</div>
-      <div class="top-tab-btn" :class="{ active: activeTab === 'patent' }"
-           @click="activeTab = 'patent'">P表管理</div>
-      <div class="top-tab-btn" :class="{ active: activeTab === 'mail' }"
-           @click="activeTab = 'mail'">发送邮件</div>
+      <div
+        class="top-tab-btn"
+        :class="{ active: activeTab === 'workflow' }"
+        @click="activeTab = 'workflow'"
+      >交底处理</div>
+      <div
+        class="top-tab-btn"
+        :class="{ active: activeTab === 'disclosure' }"
+        @click="activeTab = 'disclosure'"
+      >T表(旧)</div>
+      <div
+        class="top-tab-btn"
+        :class="{ active: activeTab === 'patent' }"
+        @click="activeTab = 'patent'"
+      >P表管理</div>
       <el-button type="danger" style="margin-left: auto;" @click="logout">退出</el-button>
     </div>
+    <DisclosureWorkflow v-if="activeTab === 'workflow'" />
     <DisclosureTable v-if="activeTab === 'disclosure'" />
     <PatentTable v-if="activeTab === 'patent'" />
-    <SendMail v-if="activeTab === 'mail'" />
   </template>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { http } from './api/http.js'
 import Auth from './components/Auth.vue'
 import PatentTable from './components/PatentTable.vue'
 import DisclosureTable from './components/DisclosureTable.vue'
-import SendMail from './components/SendMail.vue'
+import DisclosureWorkflow from './components/DisclosureWorkflow.vue'
 
 const isLoggedIn = ref(false)
-const activeTab = ref('patent')
+const activeTab = ref('workflow')
 
 const checkLogin = async () => {
   try {
-    await axios.get('/api/user/me')
+    await http.get('/api/user/me')
     isLoggedIn.value = true
   } catch {
     isLoggedIn.value = false
@@ -39,9 +48,13 @@ const checkLogin = async () => {
 onMounted(() => checkLogin())
 
 const logout = async () => {
-  await axios.post('/api/user/logout')
+  try {
+    await http.post('/api/user/logout')
+  } catch {
+    // ignore
+  }
   isLoggedIn.value = false
-  activeTab.value = 'patent'
+  activeTab.value = 'workflow'
 }
 </script>
 
@@ -65,4 +78,4 @@ const logout = async () => {
 .top-tab-btn:hover {
   color: #409eff;
 }
-</style>s
+</style>
