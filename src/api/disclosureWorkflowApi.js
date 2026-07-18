@@ -1,4 +1,4 @@
-import { http, unwrap, API_BASE, getToken } from './http.js'
+import { http, unwrap, API_BASE } from './http.js'
 
 const BASE = '/api/disclosure-workflow'
 
@@ -92,8 +92,6 @@ export async function previewMailTemplate(code, disclosureId) {
 
 export async function sendWorkflowMail({ to, subject, text, attachments, authCode }) {
   const fd = new FormData()
-  const token = getToken()
-  if (token) fd.append('token', token)
   fd.append('to', to)
   fd.append('subject', subject)
   fd.append('text', text)
