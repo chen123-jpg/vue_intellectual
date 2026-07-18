@@ -142,7 +142,7 @@ const handleRegister = async () => {
       email: regForm.email,
       password: regForm.password,
       nickName: regForm.nickName,
-      auth_code: regForm.authCode
+      authCode: regForm.authCode
     }))
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
