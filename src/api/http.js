@@ -15,6 +15,11 @@ export function setToken(token) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
+  try {
+    localStorage.removeItem('auth_user')
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
