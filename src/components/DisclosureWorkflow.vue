@@ -6,13 +6,19 @@
         <div class="sub">录入 → 主办处理/发邮件 → 定稿上传申请包 → 定稿待报同步 P 表</div>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="openCreate">录入交底</el-button>
+        <el-button v-if="perms.canCreate" type="primary" @click="openCreate">录入交底</el-button>
         <el-button @click="reload">刷新</el-button>
       </div>
     </div>
 
     <!-- 筛选 -->
     <el-form :inline="true" class="filter-form" @submit.prevent>
+      <el-form-item label="仅看我的">
+        <el-switch v-model="onlyMine" @change="onOnlyMineChange" :disabled="forceMine" />
+        <span class="hint" v-if="currentUserId != null">UID {{ currentUserId }}</span>
+        <span class="hint warn" v-else>未获取到登录用户</span>
+        <span class="hint" v-if="forceMine">（主办人强制只看本人）</span>
+      </el-form-item>
       <el-form-item label="关键词">
         <el-input v-model="query.keyword" clearable placeholder="编号/名称/申请人/联系人" style="width: 200px" />
       </el-form-item>
@@ -22,10 +28,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="主办人">
-        <el-input v-model="query.sponsor" clearable placeholder="姓名" style="width: 120px" />
-      </el-form-item>
-      <el-form-item label="主办人ID">
-        <el-input v-model="query.sponsorUserId" clearable placeholder="过滤我的" style="width: 100px" />
+        <el-input v-model="query.sponsor" clearable placeholder="姓名" style="width: 120px" :disabled="onlyMine" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="reload">查询</el-button>
@@ -51,12 +54,23 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column label="操作" width="300" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">处理</el-button>
-          <el-button link @click="onCopy(row)">复制</el-button>
-          <el-button link type="warning" @click="quickStatus(row, '11')" :disabled="!canSetFinalized(row)">定稿</el-button>
-          <el-button link type="success" @click="onPendingReport(row)">定稿待报</el-button>
+          <el-button v-if="perms.canCopy" link @click="onCopy(row)">复制</el-button>
+          <el-button
+            v-if="perms.canStatus"
+            link
+            type="warning"
+            @click="quickStatus(row, '11')"
+            :disabled="!canSetFinalized(row)"
+          >定稿</el-button>
+          <el-button
+            v-if="perms.canPending"
+            link
+            type="success"
+            @click="onPendingReport(row)"
+          >定稿待报</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -92,13 +106,28 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="主办人">
-              <el-input v-model="createForm.sponsor" />
+            <el-form-item label="主办人" required>
+              <el-select
+                v-model="createForm.sponsorUserId"
+                filterable
+                clearable
+                placeholder="选择主办人员工"
+                style="width:100%"
+                @change="onSponsorSelect"
+              >
+                <el-option
+                  v-for="s in sponsorEmployees"
+                  :key="s.id"
+                  :label="`${s.name}${s.userId ? ' (UID ' + s.userId + ')' : ' (无账号)'}`"
+                  :value="s.userId"
+                  :disabled="s.userId == null"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="主办人用户ID">
-              <el-input v-model.number="createForm.sponsorUserId" placeholder="用于过滤我的交底" />
+            <el-form-item label="主办人姓名">
+              <el-input v-model="createForm.sponsor" placeholder="随选择自动填入" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -232,12 +261,20 @@
             <!-- 状态 -->
             <el-tab-pane label="状态流转" name="status">
               <div class="toolbar-row">
-                <el-select v-model="nextStatus" placeholder="选择目标状态" style="width: 200px">
-                  <el-option v-for="s in PATENT_STATUS_OPTIONS" :key="s.code" :label="s.desc" :value="s.code" />
-                </el-select>
-                <el-input v-model="statusRemark" placeholder="备注" style="width: 240px; margin-left: 8px" />
-                <el-button type="primary" style="margin-left: 8px" :loading="saving" @click="submitStatus">变更状态</el-button>
-                <el-button type="success" :loading="saving" @click="onPendingReport(detail.disclosure)">定稿待报并同步P表</el-button>
+                <template v-if="perms.canStatus">
+                  <el-select v-model="nextStatus" placeholder="选择目标状态" style="width: 200px">
+                    <el-option v-for="s in PATENT_STATUS_OPTIONS" :key="s.code" :label="s.desc" :value="s.code" />
+                  </el-select>
+                  <el-input v-model="statusRemark" placeholder="备注" style="width: 240px; margin-left: 8px" />
+                  <el-button type="primary" style="margin-left: 8px" :loading="saving" @click="submitStatus">变更状态</el-button>
+                </template>
+                <el-button
+                  v-if="perms.canPending"
+                  type="success"
+                  :loading="saving"
+                  @click="onPendingReport(detail.disclosure)"
+                >定稿待报并同步P表</el-button>
+                <span v-if="!perms.canStatus && !perms.canPending" class="hint">当前角色无状态操作权限</span>
               </div>
               <el-table :data="detail.statusLogs || []" size="small" border class="mt12">
                 <el-table-column prop="createTime" label="时间" width="170" />
@@ -287,12 +324,13 @@
                 title="请先将状态改为「定稿」(11) 后再上传 XML 包与五书 Word"
                 class="mb12"
               />
-              <div class="toolbar-row">
+              <div class="toolbar-row" v-if="perms.canPackage">
                 <span>XML包：</span>
                 <input type="file" @change="(e) => uploadPkg(e, 'XML_PACKAGE')" :disabled="!isFinalizedOrAfter(detail.disclosure.patentStatus)" />
                 <span style="margin-left:16px">五书Word：</span>
                 <input type="file" accept=".doc,.docx" @change="(e) => uploadPkg(e, 'FIVE_BOOKS_WORD')" :disabled="!isFinalizedOrAfter(detail.disclosure.patentStatus)" />
               </div>
+              <div v-else class="hint mb8">仅主办人可上传申请包；流程人员可确认</div>
               <el-table :data="detail.packages || []" size="small" border class="mt12">
                 <el-table-column prop="packageType" label="类型" width="150">
                   <template #default="{ row }">
@@ -308,7 +346,12 @@
                 <el-table-column label="操作" width="180">
                   <template #default="{ row }">
                     <el-link :href="fileAbsoluteUrl(row.fileUrl)" target="_blank" type="primary">打开</el-link>
-                    <el-button link type="success" v-if="row.isCurrent === 1" @click="onConfirmPkg(row)">确认</el-button>
+                    <el-button
+                      link
+                      type="success"
+                      v-if="row.isCurrent === 1 && perms.canConfirm"
+                      @click="onConfirmPkg(row)"
+                    >确认</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -336,7 +379,14 @@
 
             <!-- 邮件 -->
             <el-tab-pane label="发邮件" name="mail">
-              <el-form label-width="90px">
+              <el-alert
+                v-if="!perms.canMail"
+                type="info"
+                :closable="false"
+                title="仅主办人可向联系人发邮件"
+                class="mb12"
+              />
+              <el-form label-width="100px" v-if="perms.canMail">
                 <el-form-item label="模板">
                   <el-select v-model="mailForm.templateCode" clearable placeholder="选择模板" style="width: 260px" @change="onTemplateChange">
                     <el-option v-for="t in templates" :key="t.templateCode" :label="t.templateName" :value="t.templateCode" />
@@ -352,21 +402,22 @@
                 <el-form-item label="正文">
                   <el-input v-model="mailForm.content" type="textarea" :rows="8" />
                 </el-form-item>
-                <el-form-item label="授权码">
-                  <el-input v-model="mailForm.authCode" placeholder="邮箱SMTP授权码（可选）" />
+                <el-form-item label="交底附件">
+                  <div class="mail-attach-box">
+                    <div class="hint mb8">勾选要附带的已有附件（可增删）；默认勾选交底书</div>
+                    <el-checkbox-group v-model="mailForm.attachmentIds">
+                      <div v-for="a in (detail.attachments || [])" :key="a.id" class="mail-attach-row">
+                        <el-checkbox :value="a.id" :label="a.id">
+                          {{ a.bizType === 'DISCLOSURE_DOC' ? '[交底书] ' : '[其他] ' }}{{ a.fileName }}
+                        </el-checkbox>
+                      </div>
+                    </el-checkbox-group>
+                    <div v-if="!(detail.attachments || []).length" class="hint warn">暂无附件，请先到「附件」页上传</div>
+                  </div>
                 </el-form-item>
-                <el-form-item label="附件">
-                  <input
-                    type="file"
-                    multiple
-                    ref="mailAttachmentInput"
-                    @change="onMailAttachChange"
-                    style="display: none"
-                  />
-                  <el-button @click="$refs.mailAttachmentInput.click()">选择文件</el-button>
-                  <span v-if="mailForm.attachments.length" style="margin-left:8px;color:#909399">
-                    已选 {{ mailForm.attachments.length }} 个文件
-                  </span>
+                <el-form-item label="额外文件">
+                  <input type="file" multiple @change="onMailExtraChange" />
+                  <span class="hint" v-if="mailForm.extraFiles.length">将先上传为其他附件再发送（{{ mailForm.extraFiles.length }} 个）</span>
                 </el-form-item>
                 <el-form-item>
                   <el-button type="primary" :loading="saving" @click="sendMail">发送邮件</el-button>
@@ -394,11 +445,25 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchAllAgents } from '../api/agentApi.js'
 import { fetchAllApplicants } from '../api/applicantApi.js'
 import {
+  getCurrentUserId,
+  getCurrentUserName,
+  isSponsorOnly,
+  canCreateDisclosure,
+  canCopyDisclosure,
+  canChangeStatusAsSponsor,
+  canUploadPackage,
+  canConfirmPackage,
+  canPendingReport,
+  canSendMail
+} from '../api/userSession.js'
+import { listEmployeesByType } from '../api/employeeApi.js'
+import {
   PATENT_STATUS_OPTIONS,
   statusLabel,
   isFinalizedOrAfter,
   fileAbsoluteUrl,
   searchDisclosures,
+  listBySponsor,
   createDisclosureWorkflow,
   copyDisclosure,
   updateDisclosureWorkflow,
@@ -417,16 +482,31 @@ import {
 const loading = ref(false)
 const saving = ref(false)
 const rows = ref([])
+const currentUserId = ref(getCurrentUserId())
+const currentUserName = ref(getCurrentUserName())
+const forceMine = ref(isSponsorOnly())
+/** 默认仅看当前登录用户作为主办人的交底；纯主办人强制开启 */
+const onlyMine = ref(forceMine.value || currentUserId.value != null)
+const perms = reactive({
+  canCreate: canCreateDisclosure(),
+  canCopy: canCopyDisclosure(),
+  canStatus: canChangeStatusAsSponsor(),
+  canPackage: canUploadPackage(),
+  canConfirm: canConfirmPackage(),
+  canPending: canPendingReport(),
+  canMail: canSendMail()
+})
 const query = reactive({
   keyword: '',
   patentStatus: '',
   sponsor: '',
-  sponsorUserId: ''
+  sponsorUserId: onlyMine.value && currentUserId.value != null ? currentUserId.value : ''
 })
 
 const agentList = ref([])
 const applicantList = ref([])
 const templates = ref([])
+const sponsorEmployees = ref([])
 
 const createVisible = ref(false)
 const autoGenerateNo = ref(true)
@@ -446,8 +526,8 @@ const mailForm = reactive({
   toEmail: '',
   subject: '',
   content: '',
-  authCode: '',
-  attachments: []
+  attachmentIds: [],
+  extraFiles: []
 })
 
 const detailTitle = computed(() => {
@@ -501,26 +581,86 @@ function formatSize(n) {
   return (n / 1024 / 1024).toFixed(1) + ' MB'
 }
 
+function refreshPerms() {
+  currentUserId.value = getCurrentUserId()
+  currentUserName.value = getCurrentUserName()
+  forceMine.value = isSponsorOnly()
+  perms.canCreate = canCreateDisclosure()
+  perms.canCopy = canCopyDisclosure()
+  perms.canStatus = canChangeStatusAsSponsor()
+  perms.canPackage = canUploadPackage()
+  perms.canConfirm = canConfirmPackage()
+  perms.canPending = canPendingReport()
+  perms.canMail = canSendMail()
+  if (forceMine.value) {
+    onlyMine.value = true
+    query.sponsorUserId = currentUserId.value
+  }
+}
+
 function resetQuery() {
   query.keyword = ''
   query.patentStatus = ''
   query.sponsor = ''
-  query.sponsorUserId = ''
+  onlyMine.value = forceMine.value || currentUserId.value != null
+  query.sponsorUserId = onlyMine.value ? currentUserId.value : ''
   reload()
+}
+
+function onOnlyMineChange(val) {
+  if (forceMine.value) {
+    onlyMine.value = true
+    query.sponsorUserId = currentUserId.value
+    reload()
+    return
+  }
+  if (val) {
+    if (currentUserId.value == null) {
+      ElMessage.warning('无法识别当前用户，请重新登录')
+      onlyMine.value = false
+      return
+    }
+    query.sponsorUserId = currentUserId.value
+    query.sponsor = ''
+  } else {
+    query.sponsorUserId = ''
+  }
+  reload()
+}
+
+function onSponsorSelect(userId) {
+  const hit = sponsorEmployees.value.find((s) => s.userId === userId)
+  createForm.sponsor = hit?.name || ''
+  createForm.sponsorUserId = userId ?? null
 }
 
 async function reload() {
   loading.value = true
   try {
-    const q = {
-      keyword: query.keyword || undefined,
-      patentStatus: query.patentStatus || undefined,
-      sponsor: query.sponsor || undefined
+    if (onlyMine.value && currentUserId.value != null) {
+      let list = await listBySponsor(currentUserId.value)
+      // 本地再套一层关键词/状态（主办列表接口本身只按主办过滤）
+      if (query.patentStatus) {
+        list = list.filter((r) => String(r.patentStatus) === String(query.patentStatus))
+      }
+      if (query.keyword) {
+        const kw = query.keyword.trim().toLowerCase()
+        list = list.filter((r) => {
+          const blob = [r.tempNo, r.internalNo, r.disclosureName, r.applicant, r.contactPerson, r.sponsor]
+            .map((x) => (x == null ? '' : String(x).toLowerCase()))
+            .join(' ')
+          return blob.includes(kw)
+        })
+      }
+      rows.value = list
+    } else {
+      const q = {
+        keyword: query.keyword || undefined,
+        patentStatus: query.patentStatus || undefined,
+        sponsor: query.sponsor || undefined
+      }
+      rows.value = await searchDisclosures(q)
     }
-    if (query.sponsorUserId !== '' && query.sponsorUserId != null) {
-      q.sponsorUserId = Number(query.sponsorUserId)
-    }
-    rows.value = await searchDisclosures(q)
   } catch (e) {
     ElMessage.error(e.message || '加载失败')
   } finally {
@@ -529,11 +669,29 @@ async function reload() {
 }
 
 function openCreate() {
+  if (!perms.canCreate) {
+    ElMessage.warning('仅录入人员可录入交底')
+    return
+  }
   Object.assign(createForm, emptyCreateForm())
+  // 若当前人是主办，可默认自己；否则留空由录入员选择主办人
+  if (perms.canStatus && currentUserId.value != null) {
+    createForm.sponsorUserId = currentUserId.value
+    createForm.sponsor = currentUserName.value || ''
+  }
   autoGenerateNo.value = true
   createDocFile.value = null
   createOtherFiles.value = []
   createVisible.value = true
+  loadSponsors()
+}
+
+async function loadSponsors() {
+  try {
+    sponsorEmployees.value = await listEmployeesByType('SPONSOR')
+  } catch {
+    sponsorEmployees.value = []
+  }
 }
 
 function onCreateDocChange(e) {
@@ -552,18 +710,33 @@ async function submitCreate() {
     ElMessage.warning('请上传交底书（Word）')
     return
   }
+  if (createForm.sponsorUserId == null) {
+    ElMessage.warning('请选择有登录账号的主办人')
+    return
+  }
+  const name = createDocFile.value.name || ''
+  if (!/\.(doc|docx)$/i.test(name)) {
+    ElMessage.warning('交底书必须是 Word 文件（.doc/.docx）')
+    return
+  }
   saving.value = true
   try {
-    const created = await createDisclosureWorkflow({
-      autoGenerateNo: autoGenerateNo.value,
-      disclosure: { ...createForm }
-    })
-    await uploadDisclosureAttachment(created.id, createDocFile.value, 'DISCLOSURE_DOC', {
-      uploadUserName: '录入'
-    })
-    for (const f of createOtherFiles.value) {
-      await uploadDisclosureAttachment(created.id, f, 'DISCLOSURE_OTHER', { uploadUserName: '录入' })
-    }
+    const created = await createDisclosureWorkflow(
+      {
+        autoGenerateNo: autoGenerateNo.value,
+        disclosure: {
+          ...createForm,
+          entryUserId: currentUserId.value,
+          entryUserName: currentUserName.value || '录入'
+        }
+      },
+      createDocFile.value,
+      createOtherFiles.value,
+      {
+        uploadUserId: currentUserId.value,
+        uploadUserName: currentUserName.value || '录入'
+      }
+    )
     ElMessage.success(`录入成功 ${created.tempNo || ''} / ${created.internalNo || ''}`)
     createVisible.value = false
     await reload()
@@ -613,8 +786,12 @@ async function openDetail(row) {
     mailForm.toEmail = data.disclosure.contactEmail || ''
     mailForm.subject = ''
     mailForm.content = ''
-    mailForm.authCode = ''
-    mailForm.attachments = []
+    mailForm.extraFiles = []
+    // 默认勾选交底书；若无则全不选
+    const docs = (data.attachments || []).filter((a) => a.bizType === 'DISCLOSURE_DOC')
+    mailForm.attachmentIds = docs.length
+      ? docs.map((a) => a.id)
+      : (data.attachments || []).map((a) => a.id)
     await loadPreview()
   } catch (e) {
     ElMessage.error(e.message || '加载详情失败')
@@ -666,7 +843,8 @@ async function submitStatus() {
     await changeDisclosureStatus(detail.value.disclosure.id, {
       toStatus: nextStatus.value,
       remark: statusRemark.value,
-      operatorName: '前端用户'
+      operatorUserId: currentUserId.value,
+      operatorName: currentUserName.value || '用户'
     })
     ElMessage.success('状态已更新')
     await refreshDetail()
@@ -683,7 +861,8 @@ async function quickStatus(row, code) {
     await changeDisclosureStatus(row.id, {
       toStatus: code,
       remark: '快捷定稿',
-      operatorName: '前端用户'
+      operatorUserId: currentUserId.value,
+      operatorName: currentUserName.value || '用户'
     })
     ElMessage.success('已设为定稿')
     await reload()
@@ -704,8 +883,9 @@ async function onPendingReport(row) {
   saving.value = true
   try {
     const res = await markPendingReport(row.id, {
-      operatorName: '流程员',
-      remark: '前端确认定稿待报'
+      operatorUserId: currentUserId.value,
+      operatorName: currentUserName.value || '流程员',
+      remark: '确认定稿待报'
     })
     ElMessage.success('定稿待报成功' + (res?.patent ? '，已同步P表' : ''))
     await reload()
@@ -768,7 +948,10 @@ async function uploadPkg(e, packageType) {
 
 async function onConfirmPkg(row) {
   try {
-    await confirmPackage(row.id, { confirmUserName: '流程员' })
+    await confirmPackage(row.id, {
+      confirmUserId: currentUserId.value,
+      confirmUserName: currentUserName.value || '流程员'
+    })
     ElMessage.success('已确认')
     await refreshDetail()
   } catch (e) {
@@ -792,8 +975,8 @@ async function loadPreview() {
   }
 }
 
-function onMailAttachChange(e) {
-  mailForm.attachments = Array.from(e.target.files || [])
+function onMailExtraChange(e) {
+  mailForm.extraFiles = Array.from(e.target.files || [])
 }
 
 async function sendMail() {
@@ -801,18 +984,41 @@ async function sendMail() {
     ElMessage.warning('请填写收件人')
     return
   }
+  if (!mailForm.subject?.trim() || !mailForm.content?.trim()) {
+    ElMessage.warning('请填写主题和正文（可先加载模板预览）')
+    return
+  }
+  if (currentUserId.value == null) {
+    ElMessage.warning('发信需要登录用户信息，请重新登录')
+    return
+  }
   saving.value = true
   try {
+    const disclosureId = detail.value.disclosure.id
+    const attachmentIds = [...(mailForm.attachmentIds || [])]
+    // 额外本地文件：先上传为其他附件，再纳入 attachmentIds
+    for (const f of mailForm.extraFiles) {
+      const att = await uploadDisclosureAttachment(disclosureId, f, 'DISCLOSURE_OTHER', {
+        uploadUserId: currentUserId.value,
+        uploadUserName: currentUserName.value || '用户'
+      })
+      if (att?.id != null) attachmentIds.push(att.id)
+    }
     await sendWorkflowMail({
-      to: mailForm.toEmail,
+      disclosureId,
+      templateCode: mailForm.templateCode || undefined,
+      toEmails: mailForm.toEmail,
       subject: mailForm.subject,
-      text: mailForm.content,
-      attachments: mailForm.attachments,
-      authCode: mailForm.authCode || undefined
+      content: mailForm.content,
+      attachmentIds,
+      senderUserId: currentUserId.value,
+      senderName: currentUserName.value || undefined
     })
     ElMessage.success('发送成功')
-    mailForm.attachments = []
+    mailForm.extraFiles = []
     await refreshDetail()
+    // 刷新后保持已选中（含新上传）
+    mailForm.attachmentIds = attachmentIds
   } catch (e) {
     ElMessage.error(e.message || '发送失败')
   } finally {
@@ -821,10 +1027,16 @@ async function sendMail() {
 }
 
 onMounted(async () => {
+  refreshPerms()
+  onlyMine.value = forceMine.value || currentUserId.value != null
+  query.sponsorUserId = onlyMine.value ? currentUserId.value : ''
   await reload()
   try { agentList.value = await fetchAllAgents() } catch { agentList.value = [] }
   try { applicantList.value = await fetchAllApplicants() } catch { applicantList.value = [] }
   try { templates.value = await listMailTemplates() } catch { templates.value = [] }
+  if (perms.canCreate) {
+    await loadSponsors()
+  }
 })
 </script>
 
@@ -842,6 +1054,8 @@ onMounted(async () => {
 .mb12 { margin-bottom: 12px; }
 .mt12 { margin-top: 12px; }
 .hint { color: #909399; font-size: 12px; margin-left: 8px; }
+.hint.warn { color: #e6a23c; }
+.mb8 { margin-bottom: 8px; }
 .toolbar-row {
   display: flex;
   align-items: center;
@@ -851,5 +1065,13 @@ onMounted(async () => {
 }
 .detail-body { padding-right: 8px; }
 .edit-form { max-width: 900px; }
+.mail-attach-box {
+  width: 100%;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: #fafafa;
+}
+.mail-attach-row { margin: 4px 0; }
 h4 { margin: 8px 0; font-size: 14px; color: #303133; }
 </style>

@@ -1,11 +1,29 @@
-import { http, unwrap, API_BASE, getToken } from './http.js'
+import { http, unwrap, API_BASE } from './http.js'
 
 const BASE = '/api/disclosure-workflow'
 
 // ---------- 交底 ----------
 
-export async function createDisclosureWorkflow(payload) {
-  return unwrap(await http.post(`${BASE}/disclosures`, payload))
+/**
+ * 录入交底（强制交底书 Word + 可选其他附件）
+ * @param {object} payload { autoGenerateNo, disclosure }
+ * @param {File} disclosureDoc Word 文件
+ * @param {File[]} [otherFiles]
+ * @param {{ uploadUserId?: number, uploadUserName?: string }} [meta]
+ */
+export async function createDisclosureWorkflow(payload, disclosureDoc, otherFiles = [], meta = {}) {
+  if (!disclosureDoc) {
+    throw new Error('交底书（Word）不能为空')
+  }
+  const fd = new FormData()
+  fd.append('data', JSON.stringify(payload))
+  fd.append('disclosureDoc', disclosureDoc)
+  for (const f of otherFiles || []) {
+    if (f) fd.append('otherFiles', f)
+  }
+  if (meta.uploadUserId != null) fd.append('uploadUserId', meta.uploadUserId)
+  if (meta.uploadUserName) fd.append('uploadUserName', meta.uploadUserName)
+  return unwrap(await http.post(`${BASE}/disclosures/with-attachments`, fd))
 }
 
 export async function copyDisclosure(payload) {
@@ -90,18 +108,32 @@ export async function previewMailTemplate(code, disclosureId) {
   }))
 }
 
-export async function sendWorkflowMail({ to, subject, text, attachments, authCode }) {
-  const fd = new FormData()
-  const token = getToken()
-  if (token) fd.append('token', token)
-  fd.append('to', to)
-  fd.append('subject', subject)
-  fd.append('text', text)
-  if (authCode) fd.append('auth_code', authCode)
-  if (attachments && attachments.length) {
-    attachments.forEach((file) => fd.append('attachments', file))
-  }
-  return unwrap(await http.post('/api/mail/send', fd))
+/**
+ * 工作流发信：读模板可改内容，附件用交底附件 ID 列表（可增删）
+ * @param {{
+ *   disclosureId: number,
+ *   templateCode?: string,
+ *   toEmails: string,
+ *   ccEmails?: string,
+ *   subject: string,
+ *   content: string,
+ *   attachmentIds?: number[],
+ *   senderUserId?: number,
+ *   senderName?: string
+ * }} payload
+ */
+export async function sendWorkflowMail(payload) {
+  return unwrap(await http.post(`${BASE}/mail/send`, {
+    disclosureId: payload.disclosureId,
+    templateCode: payload.templateCode || undefined,
+    toEmails: payload.toEmails,
+    ccEmails: payload.ccEmails || undefined,
+    subject: payload.subject,
+    content: payload.content,
+    attachmentIds: payload.attachmentIds || [],
+    senderUserId: payload.senderUserId,
+    senderName: payload.senderName
+  }))
 }
 
 export async function listMailLogs(id) {

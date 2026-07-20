@@ -40,6 +40,17 @@
           <el-form-item label="授权码">
             <el-input v-model="regForm.authCode" placeholder="邮箱SMTP授权码" />
           </el-form-item>
+          <el-form-item label="员工类型" required>
+            <el-checkbox-group v-model="regForm.roleCodes">
+              <el-checkbox
+                v-for="t in registerTypes"
+                :key="t.typeCode"
+                :value="t.typeCode"
+                :label="t.typeCode"
+              >{{ t.typeName }}</el-checkbox>
+            </el-checkbox-group>
+            <div class="hint">可多选；默认建议选「录入人员」。管理员请注册后由已有管理员改类型。</div>
+          </el-form-item>
           <el-form-item label="验证码">
             <div class="captcha-row">
               <el-input v-model="regForm.checkCode" placeholder="请输入验证码" style="width: 180px" />
@@ -65,6 +76,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { http, unwrap, setToken } from '../api/http.js'
+import { setCurrentUser } from '../api/userSession.js'
+import { listEmployeeTypes } from '../api/employeeApi.js'
 
 const emit = defineEmits(['login-success'])
 
@@ -72,6 +85,7 @@ const activeTab = ref('login')
 const loading = ref(false)
 const checkCodeKey = ref('')
 const checkCodeImage = ref('')
+const registerTypes = ref([])
 
 const loginForm = reactive({
   email: '',
@@ -84,7 +98,8 @@ const regForm = reactive({
   email: '',
   password: '',
   authCode: '',
-  checkCode: ''
+  checkCode: '',
+  roleCodes: ['ENTRY']
 })
 
 async function fetchCheckCode() {
@@ -99,7 +114,31 @@ async function fetchCheckCode() {
   }
 }
 
-onMounted(() => fetchCheckCode())
+async function loadRegisterTypes() {
+  try {
+    // 注册页不带 token；过滤掉 ADMIN 避免自助注册管理员
+    const all = await listEmployeeTypes(true)
+    registerTypes.value = (all || []).filter((t) => t.typeCode !== 'ADMIN' && t.typeCode !== 'CONTACT')
+    if (!registerTypes.value.length) {
+      registerTypes.value = [
+        { typeCode: 'ENTRY', typeName: '录入人员' },
+        { typeCode: 'SPONSOR', typeName: '主办人' },
+        { typeCode: 'PROCESS', typeName: '流程人员' }
+      ]
+    }
+  } catch {
+    registerTypes.value = [
+      { typeCode: 'ENTRY', typeName: '录入人员' },
+      { typeCode: 'SPONSOR', typeName: '主办人' },
+      { typeCode: 'PROCESS', typeName: '流程人员' }
+    ]
+  }
+}
+
+onMounted(async () => {
+  await fetchCheckCode()
+  await loadRegisterTypes()
+})
 
 function onTabChange() {
   fetchCheckCode()
@@ -119,6 +158,7 @@ const handleLogin = async () => {
       password: loginForm.password
     }))
     setToken(data.token)
+    setCurrentUser(data)
     ElMessage.success('登录成功')
     emit('login-success')
   } catch (err) {
@@ -134,6 +174,10 @@ const handleRegister = async () => {
     ElMessage.warning('请填写完整信息')
     return
   }
+  if (!regForm.roleCodes?.length) {
+    ElMessage.warning('请选择员工类型')
+    return
+  }
   loading.value = true
   try {
     await unwrap(await http.post('/api/account/register', {
@@ -142,11 +186,19 @@ const handleRegister = async () => {
       email: regForm.email,
       password: regForm.password,
       nickName: regForm.nickName,
-      auth_code: regForm.authCode
+      authCode: regForm.authCode,
+      roleCodes: regForm.roleCodes
     }))
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
-    Object.assign(regForm, { nickName: '', email: '', password: '', authCode: '', checkCode: '' })
+    Object.assign(regForm, {
+      nickName: '',
+      email: '',
+      password: '',
+      authCode: '',
+      checkCode: '',
+      roleCodes: ['ENTRY']
+    })
     fetchCheckCode()
   } catch (err) {
     ElMessage.error(err.message || '注册失败')
@@ -159,7 +211,7 @@ const handleRegister = async () => {
 
 <style scoped>
 .auth-container {
-  max-width: 500px;
+  max-width: 560px;
   margin: 40px auto;
 }
 .captcha-row {
@@ -172,5 +224,11 @@ const handleRegister = async () => {
   cursor: pointer;
   border: 1px solid #dcdfe6;
   border-radius: 4px;
+}
+.hint {
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
 }
 </style>
